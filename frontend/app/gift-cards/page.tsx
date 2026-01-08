@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import Header from '@/components/Header';
+import HeaderWithSuspense from '@/components/HeaderWithSuspense';
 
 const giftCardCategories = [
   {
@@ -20,7 +20,7 @@ const giftCardCategories = [
 export default function GiftCardsPage() {
   return (
     <div className="min-h-screen bg-gray-100 font-sans">
-      <Header cartCount={0} onSearch={() => {}} />
+      <HeaderWithSuspense cartCount={0} onSearch={() => {}} />
       <main className="max-w-5xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-semibold mb-2">Gift Cards</h1>
         <p className="text-sm text-gray-600 mb-6">
