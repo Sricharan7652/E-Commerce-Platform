@@ -48,14 +48,13 @@ export default function CartSidebar({ isOpen, onClose, onItemAdded }: CartSideba
       const cartData = localStorage.getItem('cart');
       let cart = cartData ? JSON.parse(cartData) : { items: [] };
       
-      const existingItemIndex = cart.items.findIndex((item: any) => item.product._id === productId);
+      const existingItemIndex = cart.items.findIndex((item: any) => item._id === productId);
       
       if (existingItemIndex >= 0) {
         cart.items[existingItemIndex].quantity += 1;
       } else {
         cart.items.push({
-          _id: `item-${Date.now()}-${Math.random()}`,
-          product: product,
+          ...product,
           quantity: 1
         });
       }
@@ -83,17 +82,13 @@ export default function CartSidebar({ isOpen, onClose, onItemAdded }: CartSideba
   const cartItems = cart?.items || [];
   const totalItems = cartItems.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0);
   const subtotal = cartItems.reduce((acc: number, item: any) => {
-    const product = item.product;
-    const price = product && typeof product === 'object' && product !== null ? product.price : 0;
-    return acc + (price * (item.quantity || 0));
+    return acc + (item.price * (item.quantity || 0));
   }, 0);
 
   // Filter recommended products (not in cart)
   const filteredRecommended = recommendedProducts.filter(recProduct => {
     return !cartItems.some((item: any) => {
-      const product = item.product;
-      const isProductObject = product && typeof product === 'object' && product !== null;
-      return isProductObject && product._id === recProduct._id;
+      return item._id === recProduct._id;
     });
   });
 
@@ -190,22 +185,20 @@ export default function CartSidebar({ isOpen, onClose, onItemAdded }: CartSideba
             <div className="grid grid-cols-4 gap-2 mb-4">
               {/* Show all cart items */}
               {cartItems.map((item: any, idx: number) => {
-                const product = item.product;
-                const isProductObject = product && typeof product === 'object' && product !== null;
-                const productImage = isProductObject && product.images && product.images.length > 0
-                  ? product.images[0]
+                const productImage = item.images && item.images.length > 0
+                  ? item.images[0]
                   : 'https://via.placeholder.com/150?text=No+Image';
                 
                 return (
                   <Link
                     key={item._id || idx}
-                    href={`/product/${isProductObject ? product._id : ''}`}
+                    href={`/product/${item._id}`}
                     onClick={onClose}
                     className="aspect-square bg-white border border-gray-200 rounded flex items-center justify-center overflow-hidden p-1 hover:border-yellow-500 hover:shadow-lg transition-all group relative"
                   >
                     <img 
                       src={productImage} 
-                      alt={isProductObject ? product.name : 'Product'} 
+                      alt={item.name} 
                       className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200" 
                       loading="lazy"
                     />

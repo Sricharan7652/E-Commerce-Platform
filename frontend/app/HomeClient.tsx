@@ -177,6 +177,51 @@ export default function HomeClient() {
     }
   };
 
+  const handleUpdateQuantity = (productId: string, quantity: number) => {
+    try {
+      const cartData = localStorage.getItem('cart');
+      let cart = cartData ? JSON.parse(cartData) : { items: [] };
+      
+      const itemIndex = cart.items.findIndex((item: any) => item._id === productId);
+      if (itemIndex >= 0) {
+        if (quantity <= 0) {
+          cart.items.splice(itemIndex, 1);
+        } else {
+          cart.items[itemIndex].quantity = quantity;
+        }
+        
+        localStorage.setItem('cart', JSON.stringify(cart));
+        
+        // Update cart count
+        const newCount = cart.items.reduce((acc: number, item: any) => acc + item.quantity, 0);
+        setCartCount(newCount);
+        
+        // Dispatch event to update other components
+        window.dispatchEvent(new Event('cartUpdated'));
+      }
+    } catch (error) {
+      console.error('Error updating quantity:', error);
+    }
+  };
+
+  const handleRemoveFromCart = (productId: string) => {
+    handleUpdateQuantity(productId, 0);
+  };
+
+  const getProductQuantity = (productId: string) => {
+    try {
+      const cartData = localStorage.getItem('cart');
+      if (cartData) {
+        const cart = JSON.parse(cartData);
+        const item = cart.items.find((item: any) => item._id === productId);
+        return item ? item.quantity : 0;
+      }
+    } catch (error) {
+      console.error('Error getting product quantity:', error);
+    }
+    return 0;
+  };
+
   const handleSearch = useCallback((searchTerm: string, category: string) => {
     const params = new URLSearchParams();
     if (searchTerm) params.set('q', searchTerm);
@@ -202,46 +247,6 @@ export default function HomeClient() {
       <HeaderWithSuspense cartCount={cartCount} onSearch={handleSearch} />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Search and Filter Bar */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <input
-                type="text"
-                placeholder="Search products..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSearch(searchTerm, category);
-                  }
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
-              />
-            </div>
-            <div className="md:w-48">
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
-              >
-                <option value="All">All Categories</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              onClick={() => handleSearch(searchTerm, category)}
-              className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 border border-yellow-600 text-sm font-medium rounded-md shadow-sm transition-all duration-200 active:scale-95"
-            >
-              Search
-            </button>
-          </div>
-        </div>
-
         {/* Results Summary */}
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-gray-900">
@@ -265,6 +270,9 @@ export default function HomeClient() {
                   stock_quantity: product.stock_quantity || 0
                 }}
                 onAddToCart={handleAddToCart}
+                onUpdateQuantity={handleUpdateQuantity}
+                onRemoveFromCart={handleRemoveFromCart}
+                initialQuantity={getProductQuantity(product._id)}
               />
             ))}
           </div>

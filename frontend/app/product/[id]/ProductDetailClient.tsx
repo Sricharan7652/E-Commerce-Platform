@@ -29,6 +29,8 @@ export default function ProductDetailClient({ params }: { params: { id: string }
       const response = await productApi.getProductById(productId);
       if (response && response.product) {
         setProduct(response.product);
+      } else {
+        console.error('No product data in response');
       }
     } catch (err) {
       console.error('Failed to fetch product:', err);
@@ -78,14 +80,13 @@ export default function ProductDetailClient({ params }: { params: { id: string }
       const cartData = localStorage.getItem('cart');
       let cart = cartData ? JSON.parse(cartData) : { items: [] };
       
-      const existingItemIndex = cart.items.findIndex((item: any) => item.product._id === product._id);
+      const existingItemIndex = cart.items.findIndex((item: any) => item._id === product._id);
       
       if (existingItemIndex >= 0) {
         cart.items[existingItemIndex].quantity += quantity;
       } else {
         cart.items.push({
-          _id: `item-${Date.now()}-${Math.random()}`,
-          product: product,
+          ...product,
           quantity: quantity
         });
       }
@@ -107,14 +108,13 @@ export default function ProductDetailClient({ params }: { params: { id: string }
       const cartData = localStorage.getItem('cart');
       let cart = cartData ? JSON.parse(cartData) : { items: [] };
       
-      const existingItemIndex = cart.items.findIndex((item: any) => item.product._id === product._id);
+      const existingItemIndex = cart.items.findIndex((item: any) => item._id === product._id);
       
       if (existingItemIndex >= 0) {
         cart.items[existingItemIndex].quantity += quantity;
       } else {
         cart.items.push({
-          _id: `item-${Date.now()}-${Math.random()}`,
-          product: product,
+          ...product,
           quantity: quantity
         });
       }

@@ -20,11 +20,21 @@ interface Product {
 interface ProductCardProps {
   product: Product;
   onAddToCart: (product: Product) => void;
+  onUpdateQuantity?: (productId: string, quantity: number) => void;
+  onRemoveFromCart?: (productId: string) => void;
+  initialQuantity?: number;
 }
 
-export default function ProductCard({ product, onAddToCart }: ProductCardProps) {
+export default function ProductCard({ 
+  product, 
+  onAddToCart, 
+  onUpdateQuantity, 
+  onRemoveFromCart, 
+  initialQuantity = 0 
+}: ProductCardProps) {
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [wishlistId, setWishlistId] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState(initialQuantity);
 
   useEffect(() => {
     checkWishlist();
@@ -72,6 +82,32 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
       window.dispatchEvent(new Event('wishlistUpdated'));
     } catch (err) {
       // Silent error handling
+    }
+  };
+
+  const handleAddToCart = () => {
+    onAddToCart(product);
+    setQuantity(1);
+  };
+
+  const handleIncreaseQuantity = () => {
+    const newQuantity = quantity + 1;
+    setQuantity(newQuantity);
+    if (onUpdateQuantity) {
+      onUpdateQuantity(product._id, newQuantity);
+    }
+  };
+
+  const handleDecreaseQuantity = () => {
+    if (quantity > 1) {
+      const newQuantity = quantity - 1;
+      setQuantity(newQuantity);
+      if (onUpdateQuantity) {
+        onUpdateQuantity(product._id, newQuantity);
+      }
+    } else if (quantity === 1 && onRemoveFromCart) {
+      onRemoveFromCart(product._id);
+      setQuantity(0);
     }
   };
 
@@ -144,13 +180,43 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
           <div className="text-xs text-red-600 mb-2 font-semibold">Currently unavailable</div>
         )}
 
-        <button 
-          onClick={() => onAddToCart(product)}
-          disabled={product.stock_quantity === 0}
-          className="bg-yellow-400 hover:bg-yellow-500 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md py-2 px-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:ring-offset-2 mt-auto border border-yellow-600 shadow-sm transition-all duration-200 active:scale-95"
-        >
-          {product.stock_quantity > 0 ? 'Add to Cart' : 'Out of Stock'}
-        </button>
+        {quantity > 0 ? (
+          <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center border border-gray-300 rounded">
+              <button
+                onClick={handleDecreaseQuantity}
+                className="px-2 py-1 hover:bg-gray-100 text-gray-700 font-bold transition-colors"
+                aria-label="Decrease quantity"
+              >
+                −
+              </button>
+              <span className="px-2 py-1 min-w-[2rem] text-center border-x border-gray-300 font-medium text-sm">
+                {quantity}
+              </span>
+              <button
+                onClick={handleIncreaseQuantity}
+                className="px-2 py-1 hover:bg-gray-100 text-gray-700 font-bold transition-colors"
+                aria-label="Increase quantity"
+              >
+                +
+              </button>
+            </div>
+            <button
+              onClick={handleDecreaseQuantity}
+              className="text-red-600 hover:text-red-700 text-sm font-medium transition-colors"
+            >
+              Delete
+            </button>
+          </div>
+        ) : (
+          <button 
+            onClick={handleAddToCart}
+            disabled={product.stock_quantity === 0}
+            className="bg-yellow-400 hover:bg-yellow-500 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md py-2 px-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:ring-offset-2 mt-auto border border-yellow-600 shadow-sm transition-all duration-200 active:scale-95"
+          >
+            {product.stock_quantity > 0 ? 'Add to Cart' : 'Out of Stock'}
+          </button>
+        )}
       </div>
     </div>
   );

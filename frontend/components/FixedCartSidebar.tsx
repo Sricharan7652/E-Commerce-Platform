@@ -86,9 +86,7 @@ export default function FixedCartSidebar() {
   const cartItems = cart?.items || [];
   const totalItems = cartItems.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0);
   const subtotal = cartItems.reduce((acc: number, item: any) => {
-    const product = item.product;
-    const price = product && typeof product === 'object' && product !== null ? product.price : 0;
-    return acc + (price * (item.quantity || 0));
+    return acc + (item.price * (item.quantity || 0));
   }, 0);
 
   // Hide the fixed sidebar when the cart is empty. We wait for first
@@ -107,13 +105,8 @@ export default function FixedCartSidebar() {
         {cartItems.length > 0 ? (
           <div className="space-y-4">
             {cartItems.map((item: any, idx: number) => {
-              const product = item.product;
-              const isProductObject = product && typeof product === 'object' && product !== null;
-              const productId = isProductObject ? product._id : '';
-              const productName = isProductObject ? product.name : 'Product';
-              const productPrice = isProductObject ? product.price : 0;
-              const productImage = isProductObject && product.images && product.images.length > 0
-                ? product.images[0]
+              const productImage = item.images && item.images.length > 0
+                ? item.images[0]
                 : 'https://via.placeholder.com/150?text=No+Image';
               
               return (
@@ -122,25 +115,25 @@ export default function FixedCartSidebar() {
                   className="flex gap-3 pb-4 border-b border-gray-200 last:border-b-0"
                 >
                   <Link
-                    href={`/product/${productId}`}
+                    href={`/product/${item._id}`}
                     className="w-16 h-16 flex-shrink-0 bg-white border border-gray-200 rounded flex items-center justify-center overflow-hidden"
                   >
                     <img 
                       src={productImage} 
-                      alt={productName} 
+                      alt={item.name} 
                       className="w-full h-full object-contain" 
                       loading="lazy"
                     />
                   </Link>
                   <div className="flex-1 min-w-0">
                     <Link
-                      href={`/product/${productId}`}
+                      href={`/product/${item._id}`}
                       className="text-sm font-medium text-blue-700 hover:text-orange-600 hover:underline transition-colors line-clamp-2"
                     >
-                      {productName}
+                      {item.name}
                     </Link>
                     <div className="text-sm font-bold text-gray-900 mt-1">
-                      {formatCurrencyWithCommas(productPrice)}
+                      {formatCurrencyWithCommas(item.price)}
                     </div>
                     <div className="flex items-center gap-3 mt-2 text-xs">
                       <div className="flex items-center gap-1">
