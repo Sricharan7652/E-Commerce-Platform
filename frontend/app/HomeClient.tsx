@@ -138,6 +138,45 @@ export default function HomeClient() {
     };
   }, []);
 
+  const handleAddToCart = (product: Product) => {
+    try {
+      // Get current cart from localStorage
+      const cartData = localStorage.getItem('cart');
+      const cart = cartData ? JSON.parse(cartData) : { items: [] };
+      
+      // Check if product already exists in cart
+      const existingItemIndex = cart.items.findIndex((item: any) => item._id === product._id);
+      
+      if (existingItemIndex >= 0) {
+        // Update quantity if already in cart
+        cart.items[existingItemIndex].quantity += 1;
+      } else {
+        // Add new item to cart
+        cart.items.push({
+          ...product,
+          quantity: 1
+        });
+      }
+      
+      // Save updated cart
+      localStorage.setItem('cart', JSON.stringify(cart));
+      
+      // Update cart count
+      const newCount = cart.items.reduce((acc: number, item: any) => acc + item.quantity, 0);
+      setCartCount(newCount);
+      
+      // Show success message
+      showToast('Added to Cart');
+      showCartSidebar();
+      
+      // Dispatch event to update other components
+      window.dispatchEvent(new Event('cartUpdated'));
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      showNotification('Failed to add item to cart', 'error');
+    }
+  };
+
   const handleSearch = useCallback((searchTerm: string, category: string) => {
     const params = new URLSearchParams();
     if (searchTerm) params.set('q', searchTerm);
@@ -225,10 +264,7 @@ export default function HomeClient() {
                   numReviews: product.numReviews || 0,
                   stock_quantity: product.stock_quantity || 0
                 }}
-                onAddToCart={() => {
-                  showToast('Added to Cart');
-                  showCartSidebar();
-                }}
+                onAddToCart={handleAddToCart}
               />
             ))}
           </div>

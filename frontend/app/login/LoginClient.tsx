@@ -31,8 +31,8 @@ export default function LoginClient() {
         );
 
         if (user) {
-          // Store user session
-          localStorage.setItem('currentUser', JSON.stringify(user));
+          // Store user session with consistent keys
+          localStorage.setItem('user', JSON.stringify(user));
           localStorage.setItem('token', 'dummy-token-' + Date.now());
           
           // Redirect to intended page or home

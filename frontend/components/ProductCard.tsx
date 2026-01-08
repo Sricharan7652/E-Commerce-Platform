@@ -7,11 +7,14 @@ import { formatCurrencyWithCommas } from '@/lib/currency';
 interface Product {
   _id: string;
   name: string;
+  description: string;
   price: number;
+  category: string;
   images: string[];
   rating: number;
   numReviews: number;
   stock_quantity: number;
+  brand?: string;
 }
 
 interface ProductCardProps {

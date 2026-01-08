@@ -1,4 +1,3 @@
-import { getProductById } from '@/lib/dummyProducts';
 import ProductDetailClient from './ProductDetailClient';
 
 export async function generateStaticParams() {

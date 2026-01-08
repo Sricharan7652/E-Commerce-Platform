@@ -8,7 +8,7 @@ import { useNotification } from '@/hooks/useNotification';
 import { formatCurrencyWithCommas } from '@/lib/currency';
 import { useAmazonToast } from '@/hooks/useAmazonToast';
 import { useCartSidebar } from '@/hooks/useCartSidebar';
-import { getProductById } from '@/lib/dummyProducts';
+import { productApi } from '@/lib/api';
 
 export default function ProductDetailClient({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -22,16 +22,16 @@ export default function ProductDetailClient({ params }: { params: { id: string }
   const { showToast, ToastComponent } = useAmazonToast();
   const { showCartSidebar, CartSidebarComponent } = useCartSidebar();
 
-  // Use dummy data for products
-  const fetchProduct = () => {
+  // Use API to fetch product
+  const fetchProduct = async () => {
     try {
       const productId = params.id as string;
-      const foundProduct = getProductById(productId);
-      if (foundProduct) {
-        setProduct(foundProduct);
+      const response = await productApi.getProductById(productId);
+      if (response && response.product) {
+        setProduct(response.product);
       }
     } catch (err) {
-      // Silent error handling
+      console.error('Failed to fetch product:', err);
     } finally {
       setLoading(false);
     }
