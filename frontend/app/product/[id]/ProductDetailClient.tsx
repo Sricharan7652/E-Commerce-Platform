@@ -227,10 +227,10 @@ export default function ProductDetailClient({ params }: { params: { id: string }
       {CartSidebarComponent}
       <Header cartCount={cartCount} onSearch={() => {}} />
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
+      <main className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           {/* Image Carousel */}
-          <div className="lg:w-2/5">
+          <div className="lg:col-span-2">
             <div className="flex flex-col gap-4">
               {/* Main Image */}
               <div className="flex justify-center items-center bg-white p-8 rounded-lg border border-gray-200 shadow-sm min-h-[400px]">
@@ -269,7 +269,7 @@ export default function ProductDetailClient({ params }: { params: { id: string }
           </div>
 
           {/* Product Details */}
-          <div className="lg:w-2/5 flex flex-col gap-4">
+          <div className="lg:col-span-1 flex flex-col gap-4">
             <h1 className="text-2xl md:text-3xl font-normal text-gray-900 leading-tight">{product.name}</h1>
             
             <div className="flex items-center gap-4">
@@ -322,7 +322,7 @@ export default function ProductDetailClient({ params }: { params: { id: string }
           </div>
 
           {/* Buy Box */}
-          <div className="lg:w-1/5 border border-gray-300 rounded-lg p-6 h-fit shadow-md bg-white">
+          <div className="lg:col-span-1 border border-gray-300 rounded-lg p-6 h-fit shadow-md bg-white">
             <div className="flex items-baseline gap-1 mb-4">
               <span className="text-2xl md:text-3xl font-bold text-red-700">{formatCurrencyWithCommas(product.price)}</span>
             </div>
@@ -352,21 +352,23 @@ export default function ProductDetailClient({ params }: { params: { id: string }
               </div>
             )}
 
-            <button 
-              onClick={handleAddToCart}
-              disabled={product.stock_quantity === 0}
-              className="w-full bg-yellow-400 hover:bg-yellow-500 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md py-2.5 mb-2 text-sm font-medium shadow-sm border border-yellow-600 transition-all duration-200 active:scale-95"
-            >
-              Add to Cart
-            </button>
-            
-            <button 
-              onClick={handleBuyNow}
-              disabled={product.stock_quantity === 0}
-              className="w-full bg-orange-400 hover:bg-orange-500 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md py-2.5 text-sm font-medium shadow-sm transition-all duration-200 active:scale-95"
-            >
-              Buy Now
-            </button>
+            <div className="space-y-2 mb-4">
+              <button
+                onClick={handleAddToCart}
+                disabled={product.stock_quantity === 0}
+                className="w-full bg-yellow-400 hover:bg-yellow-500 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:ring-offset-2 transition-all duration-200 active:scale-95"
+              >
+                Add to Cart
+              </button>
+              
+              <button
+                onClick={handleBuyNow}
+                disabled={product.stock_quantity === 0}
+                className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all duration-200 active:scale-95"
+              >
+                Buy now
+              </button>
+            </div>
 
             <div className="border-t border-gray-300 my-3"></div>
 

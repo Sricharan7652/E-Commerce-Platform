@@ -35,6 +35,9 @@ export default function LoginClient() {
           localStorage.setItem('user', JSON.stringify(user));
           localStorage.setItem('token', 'dummy-token-' + Date.now());
           
+          // Dispatch event to notify other components
+          window.dispatchEvent(new Event('userLoggedIn'));
+          
           // Redirect to intended page or home
           const redirectTo = searchParams?.get('redirect') || '/';
           router.push(redirectTo);
@@ -66,8 +69,11 @@ export default function LoginClient() {
         localStorage.setItem('users', JSON.stringify(users));
         
         // Auto-login after registration
-        localStorage.setItem('currentUser', JSON.stringify(newUser));
+        localStorage.setItem('user', JSON.stringify(newUser));
         localStorage.setItem('token', 'dummy-token-' + Date.now());
+        
+        // Dispatch event to notify other components
+        window.dispatchEvent(new Event('userLoggedIn'));
         
         const redirectTo = searchParams?.get('redirect') || '/';
         router.push(redirectTo);

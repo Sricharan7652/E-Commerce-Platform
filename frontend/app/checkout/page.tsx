@@ -51,6 +51,19 @@ export default function Checkout() {
   useEffect(() => {
     fetchCart();
     checkAuth();
+    
+    // Listen for storage changes (after login)
+    const handleStorageChange = () => {
+      checkAuth();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('userLoggedIn', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('userLoggedIn', handleStorageChange);
+    };
   }, []);
 
   // Check auth using localStorage only (no API)
