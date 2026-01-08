@@ -108,7 +108,14 @@ export default function Checkout() {
       return;
     }
     
-    // Allow guest checkout - no authentication required
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      showNotification('Please sign in to place your order', 'error');
+      // Redirect to login page with return URL
+      router.push('/login?redirect=/checkout');
+      return;
+    }
+    
     await proceedWithOrder();
   };
 

@@ -26,10 +26,13 @@ export default function ProductDetailClient({ params }: { params: { id: string }
   const fetchProduct = async () => {
     try {
       const productId = params.id as string;
+      console.log('Fetching product with ID:', productId);
       const response = await productApi.getProductById(productId);
+      console.log('API response:', response);
       
       // API returns {product: {...}} structure
       if (response && response.product) {
+        console.log('Setting product:', response.product);
         setProduct(response.product);
       } else {
         console.error('No product data found, response:', response);
@@ -198,6 +201,8 @@ export default function ProductDetailClient({ params }: { params: { id: string }
     );
   }
 
+  console.log('Product data:', product); // Debug log
+
   const images = product.images && product.images.length > 0 
     ? product.images 
     : ['https://via.placeholder.com/500x500?text=No+Image'];
@@ -324,11 +329,11 @@ export default function ProductDetailClient({ params }: { params: { id: string }
             
             <div className="text-sm text-gray-600 mb-4">
               {product.stock_quantity > 10 ? (
-                <><span className="text-green-700 font-semibold">FREE delivery</span> <span className="font-bold">Tomorrow</span>.</>
+                <span><span className="text-green-700 font-semibold">FREE delivery</span> <span className="font-bold">Tomorrow</span>.</span>
               ) : product.stock_quantity > 0 ? (
-                <>Only <span className="font-bold text-orange-600">{product.stock_quantity}</span> left in stock - order soon.</>
+                <span>Only <span className="font-bold text-orange-600">{product.stock_quantity}</span> left in stock - order soon.</span>
               ) : (
-                <><span className="text-red-600 font-semibold">Currently unavailable</span></>
+                <span><span className="text-red-600 font-semibold">Currently unavailable</span></span>
               )}
             </div>
 
