@@ -10,7 +10,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ['https://e-commerce-platform-4tn0.onrender.com', 'http://localhost:3000'],
+  origin: ['https://e-commerce-platform-08qc.onrender.com', 'https://e-commerce-platform-4tn0.onrender.com', 'http://localhost:3000', 'http://localhost:3001'],
   credentials: true
 }));
 app.use(express.json());

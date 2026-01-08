@@ -6,7 +6,7 @@ export const getBaseURL = () => {
   if (envUrl) {
     return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`;
   }
-  return 'https://e-commerce-platform-4tn0.onrender.com/api';
+  return 'https://e-commerce-platform-08qc.onrender.com/api';
 };
 
 const api = axios.create({
