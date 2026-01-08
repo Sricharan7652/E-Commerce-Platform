@@ -6,6 +6,7 @@ import Header from '@/components/Header';
 import { useNotification } from '@/hooks/useNotification';
 import { formatCurrencyWithCommas } from '@/lib/currency';
 import SignInPrompt from '@/components/SignInPrompt';
+import { getBaseURL } from '@/lib/api';
 
 export default function Checkout() {
   const router = useRouter();
@@ -192,7 +193,8 @@ export default function Checkout() {
             const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
             try {
-              const response = await fetch('http://localhost:5000/api/email/send-order-confirmation', {
+              const apiUrl = `${getBaseURL()}/email/send-order-confirmation`;
+              const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',

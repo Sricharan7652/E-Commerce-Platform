@@ -1,20 +1,20 @@
 import axios from 'axios';
 
+// Construct base URL - append /api if not already present
+export const getBaseURL = () => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (envUrl) {
+    return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`;
+  }
+  return 'https://e-commerce-platform-4tn0.onrender.com/api';
+};
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
-  timeout: 10000, // 10 second timeout
+  baseURL: getBaseURL(),
+  timeout: 30000, // 30 second timeout for deployed backend (Render can be slow on first request)
 });
 
-// Add auth token to requests if available
-if (typeof window !== 'undefined') {
-  const token = localStorage.getItem('token');
-  if (token) {
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  }
-
-  // Set default timeout for all requests
-  api.defaults.timeout = 10000;
-}
+// Note: Auth token is now handled in request interceptor for dynamic updates
 
 // Add response interceptor to handle errors gracefully
 api.interceptors.response.use(
@@ -25,7 +25,26 @@ api.interceptors.response.use(
       console.warn('Request timeout - backend may not be running');
     } else if (error.code === 'ERR_NETWORK') {
       console.warn('Network error - backend may not be running');
+    } else if (error.response) {
+      // Server responded with error status
+      console.warn('API Error:', error.response.status, error.response.data);
     }
+    return Promise.reject(error);
+  }
+);
+
+// Request interceptor to update auth token dynamically
+api.interceptors.request.use(
+  (config) => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+    return config;
+  },
+  (error) => {
     return Promise.reject(error);
   }
 );
