@@ -102,7 +102,7 @@ export default function CartSidebar({ isOpen, onClose, onItemAdded }: CartSideba
       
       {/* Recommended Products on Left Side */}
       {filteredRecommended.length > 0 && (
-        <div className="fixed left-0 top-0 h-full w-[calc(100%-384px)] bg-gray-50 z-45 overflow-y-auto">
+        <div className="fixed left-0 top-0 h-full w-[calc(100%-384px)] bg-gray-50 z-40 overflow-y-auto">
           <div className="max-w-7xl mx-auto p-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">You might also like</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">

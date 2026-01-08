@@ -70,7 +70,7 @@ export const productApi = {
   getProductById: async (id: string) => {
     try {
       const response = await api.get(`/products/${id}`);
-      return response.data.product;
+      return response.data; // Return the full response which contains {product: {...}}
     } catch (error: any) {
       console.warn('Failed to fetch product from API:', error.message);
       throw error;

@@ -108,12 +108,7 @@ export default function Checkout() {
       return;
     }
     
-    // Require sign-in to place order
-    if (!isAuthenticated) {
-      setShowSignInPrompt(true);
-      return;
-    }
-
+    // Allow guest checkout - no authentication required
     await proceedWithOrder();
   };
 
@@ -135,9 +130,7 @@ export default function Checkout() {
 
       // Calculate totals
       const subtotal = cartItems.reduce((acc: number, item: any) => {
-        const product = item.product;
-        const price = product && typeof product === 'object' && product !== null ? product.price : 0;
-        return acc + (price * (item.quantity || 0));
+        return acc + (item.price * (item.quantity || 0));
       }, 0);
       const tax = subtotal * 0.1;
       const shipping = subtotal > 100 ? 0 : 10;
@@ -147,13 +140,9 @@ export default function Checkout() {
       const order = {
         _id: `order-${Date.now()}-${Math.random()}`,
         orderItems: cartItems.map((item: any) => ({
-          product: item.product,
+          product: item,
           quantity: item.quantity,
-          price: item.product && typeof item.product === 'object' ? item.product.price : 0,
-          image: item.product && typeof item.product === 'object' && item.product.images && item.product.images.length > 0
-            ? item.product.images[0]
-            : 'https://via.placeholder.com/150?text=No+Image',
-          name: item.product && typeof item.product === 'object' ? item.product.name : 'Product'
+          price: item.price
         })),
         shippingAddress: address,
         totalPrice: totalPrice,

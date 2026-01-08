@@ -40,6 +40,26 @@ export default function ProductCard({
     checkWishlist();
   }, []);
 
+  useEffect(() => {
+    // Update quantity when cart changes
+    const handleCartUpdate = () => {
+      try {
+        const cartData = localStorage.getItem('cart');
+        if (cartData) {
+          const cart = JSON.parse(cartData);
+          const item = cart.items.find((item: any) => item._id === product._id);
+          setQuantity(item ? item.quantity : 0);
+        }
+      } catch (err) {
+        // Silent error handling
+      }
+    };
+
+    handleCartUpdate(); // Check on mount
+    window.addEventListener('cartUpdated', handleCartUpdate);
+    return () => window.removeEventListener('cartUpdated', handleCartUpdate);
+  }, [product._id]);
+
   // Use localStorage for wishlist
   const checkWishlist = () => {
     try {
