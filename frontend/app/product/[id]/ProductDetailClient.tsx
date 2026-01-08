@@ -27,20 +27,10 @@ export default function ProductDetailClient({ params }: { params: { id: string }
     try {
       const productId = params.id as string;
       const response = await productApi.getProductById(productId);
-      console.log('API Response:', response); // Debug log
       
-      // Handle different response structures
-      let productData = null;
+      // API returns {product: {...}} structure
       if (response && response.product) {
-        productData = response.product;
-      } else if (response && response._id) {
-        productData = response;
-      } else if (response) {
-        productData = response;
-      }
-      
-      if (productData) {
-        setProduct(productData);
+        setProduct(response.product);
       } else {
         console.error('No product data found, response:', response);
       }

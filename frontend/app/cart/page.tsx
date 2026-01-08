@@ -120,9 +120,7 @@ export default function Cart() {
 
   const totalItems = itemsForTotals.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0);
   const subtotal = itemsForTotals.reduce((acc: number, item: any) => {
-    const product = item.product;
-    const price = product && typeof product === 'object' && product !== null ? product.price : 0;
-    return acc + (price * (item.quantity || 0));
+    return acc + (item.price * (item.quantity || 0));
   }, 0);
   const tax = subtotal * 0.1;
   const shipping = subtotal > 100 ? 0 : 10;
@@ -161,18 +159,15 @@ export default function Cart() {
             </div>
           ) : (
             cartItems.map((item: any, index: number) => {
-              const product = item.product;
-              const isProductObject = product && typeof product === 'object' && product !== null;
-              const productId = isProductObject ? product._id : product;
-              const productName = isProductObject ? product.name : 'Product';
-              const productPrice = isProductObject ? product.price : 0;
-              const productImage = isProductObject && product.images && product.images.length > 0
-                ? product.images[0]
+              const productId = item._id;
+              const productName = item.name;
+              const productPrice = item.price;
+              const productImage = item.images && item.images.length > 0
+                ? item.images[0]
                 : 'https://via.placeholder.com/150?text=No+Image';
-              const selectionKey = item._id ? String(item._id) : String(index);
+              const selectionKey = String(productId);
 
               return (
-
                 <div key={selectionKey} className="flex gap-4 py-6 border-b border-gray-200 last:border-b-0">
                   <div className="flex flex-col items-center gap-2">
                     <input
@@ -197,8 +192,8 @@ export default function Cart() {
                     >
                       {productName}
                     </Link>
-                    <div className={`text-xs mt-1 font-medium ${isProductObject && product.stock_quantity > 0 ? 'text-green-700' : 'text-red-600'}`}>
-                      {isProductObject && product.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'}
+                    <div className={`text-xs mt-1 font-medium ${item.stock_quantity > 0 ? 'text-green-700' : 'text-red-600'}`}>
+                      {item.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'}
                     </div>
                     <div className="flex flex-wrap items-center gap-3 mt-3 text-sm">
                       <div className="flex items-center gap-2">

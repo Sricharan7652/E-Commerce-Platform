@@ -96,7 +96,7 @@ export default function OrderConfirmationClient() {
             <div>
               <h3 className="font-medium text-gray-900 mb-2">Shipping Address</h3>
               <p className="text-sm text-gray-600">
-                {order.shippingAddress?.name}<br />
+                {order.shippingAddress?.fullName}<br />
                 {order.shippingAddress?.address}<br />
                 {order.shippingAddress?.city}, {order.shippingAddress?.state} {order.shippingAddress?.zipCode}<br />
                 {order.shippingAddress?.country}
@@ -114,7 +114,7 @@ export default function OrderConfirmationClient() {
           <div className="border-t border-gray-200 pt-4">
             <h3 className="font-medium text-gray-900 mb-4">Items Ordered</h3>
             <div className="space-y-4">
-              {order.items?.map((item: any) => (
+              {order.orderItems?.map((item: any) => (
                 <div key={item._id} className="flex gap-4">
                   <img
                     src={item.product?.images?.[0] || 'https://via.placeholder.com/80x80?text=No+Image'}
@@ -137,7 +137,7 @@ export default function OrderConfirmationClient() {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Subtotal:</span>
-                <span>{formatCurrencyWithCommas(order.totalAmount)}</span>
+                <span>{formatCurrencyWithCommas(order.totalPrice)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span>Shipping:</span>
@@ -145,7 +145,7 @@ export default function OrderConfirmationClient() {
               </div>
               <div className="flex justify-between font-semibold text-lg">
                 <span>Total:</span>
-                <span>{formatCurrencyWithCommas(order.totalAmount)}</span>
+                <span>{formatCurrencyWithCommas(order.totalPrice)}</span>
               </div>
             </div>
           </div>
