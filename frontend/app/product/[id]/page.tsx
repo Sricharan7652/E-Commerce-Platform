@@ -5,6 +5,6 @@ export async function generateStaticParams() {
   return [];
 }
 
-export default function ProductDetail({ params }: { params: { id: string } }) {
-  return <ProductDetailClient params={params} />;
+export default function ProductDetail() {
+  return <ProductDetailClient />;
 }

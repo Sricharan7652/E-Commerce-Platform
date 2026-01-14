@@ -47,9 +47,9 @@ export default function CartSidebar({ isOpen, onClose, onItemAdded }: CartSideba
 
       const cartData = localStorage.getItem('cart');
       let cart = cartData ? JSON.parse(cartData) : { items: [] };
-      
+
       const existingItemIndex = cart.items.findIndex((item: any) => item._id === productId);
-      
+
       if (existingItemIndex >= 0) {
         cart.items[existingItemIndex].quantity += 1;
       } else {
@@ -58,7 +58,7 @@ export default function CartSidebar({ isOpen, onClose, onItemAdded }: CartSideba
           quantity: 1
         });
       }
-      
+
       localStorage.setItem('cart', JSON.stringify(cart));
       window.dispatchEvent(new Event('cartUpdated'));
       fetchCart();
@@ -94,15 +94,15 @@ export default function CartSidebar({ isOpen, onClose, onItemAdded }: CartSideba
 
   return (
     <>
-      {/* Backdrop - Transparent so home page shows through */}
-      <div 
-        className="fixed inset-0 bg-black bg-opacity-20 z-40"
+      {/* Backdrop - Transparent so home page shows through - HIDDEN ON DESKTOP */}
+      <div
+        className="fixed inset-0 bg-black bg-opacity-20 z-40 lg:hidden"
         onClick={onClose}
       />
-      
-      {/* Recommended Products on Left Side */}
+
+      {/* Recommended Products on Left Side - HIDDEN ON DESKTOP */}
       {filteredRecommended.length > 0 && (
-        <div className="fixed left-0 top-0 h-full w-[calc(100%-384px)] bg-gray-50 z-40 overflow-y-auto">
+        <div className="fixed left-0 top-0 h-full w-[calc(100%-384px)] bg-gray-50 z-40 overflow-y-auto lg:hidden">
           <div className="max-w-7xl mx-auto p-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">You might also like</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -111,7 +111,7 @@ export default function CartSidebar({ isOpen, onClose, onItemAdded }: CartSideba
                   ? product.images[0]
                   : 'https://via.placeholder.com/150?text=No+Image';
                 const isAdding = addingProduct === product._id;
-                
+
                 return (
                   <div
                     key={`rec-${product._id || idx}`}
@@ -123,10 +123,10 @@ export default function CartSidebar({ isOpen, onClose, onItemAdded }: CartSideba
                       className="block"
                     >
                       <div className="aspect-square bg-white rounded mb-2 overflow-hidden flex items-center justify-center">
-                        <img 
-                          src={productImage} 
-                          alt={product.name} 
-                          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" 
+                        <img
+                          src={productImage}
+                          alt={product.name}
+                          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                           loading="lazy"
                         />
                       </div>
@@ -161,9 +161,9 @@ export default function CartSidebar({ isOpen, onClose, onItemAdded }: CartSideba
           </div>
         </div>
       )}
-      
-      {/* Sidebar */}
-      <div className="fixed right-0 top-0 h-full w-96 bg-white z-50 shadow-2xl overflow-y-auto">
+
+      {/* Sidebar - HIDDEN ON DESKTOP */}
+      <div className="fixed right-0 top-0 h-full w-96 bg-white z-50 shadow-2xl overflow-y-auto lg:hidden">
         {/* Header */}
         <div className="bg-white border-b p-4 flex items-center justify-between sticky top-0 z-10">
           <div className="flex items-center gap-2">
@@ -188,7 +188,7 @@ export default function CartSidebar({ isOpen, onClose, onItemAdded }: CartSideba
                 const productImage = item.images && item.images.length > 0
                   ? item.images[0]
                   : 'https://via.placeholder.com/150?text=No+Image';
-                
+
                 return (
                   <Link
                     key={item._id || idx}
@@ -196,10 +196,10 @@ export default function CartSidebar({ isOpen, onClose, onItemAdded }: CartSideba
                     onClick={onClose}
                     className="aspect-square bg-white border border-gray-200 rounded flex items-center justify-center overflow-hidden p-1 hover:border-yellow-500 hover:shadow-lg transition-all group relative"
                   >
-                    <img 
-                      src={productImage} 
-                      alt={item.name} 
-                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200" 
+                    <img
+                      src={productImage}
+                      alt={item.name}
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
                       loading="lazy"
                     />
                     {item.quantity > 1 && (
@@ -228,14 +228,14 @@ export default function CartSidebar({ isOpen, onClose, onItemAdded }: CartSideba
           </div>
 
           <div className="space-y-2 mb-4">
-            <Link 
+            <Link
               href="/checkout"
               onClick={onClose}
               className="block w-full bg-yellow-400 hover:bg-yellow-500 rounded-md py-2.5 text-center text-sm font-medium shadow-sm border border-yellow-600 transition-all duration-200 active:scale-95"
             >
               Proceed to Buy ({totalItems} {totalItems === 1 ? 'item' : 'items'})
             </Link>
-            <Link 
+            <Link
               href="/cart"
               onClick={onClose}
               className="block w-full bg-white border border-gray-300 hover:bg-gray-50 rounded-md py-2.5 text-center text-sm font-medium transition-colors"

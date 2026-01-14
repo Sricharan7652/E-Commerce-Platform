@@ -101,6 +101,51 @@ router.post('/', auth, async (req, res) => {
     // Clear cart
     await pool.query('DELETE FROM cart WHERE user_id = $1', [userId]);
 
+    // Send confirmation email
+    try {
+      // Get user email
+      const userResult = await pool.query('SELECT email, name FROM users WHERE id = $1', [userId]);
+      const user = userResult.rows[0];
+
+      if (user && user.email) {
+        const message = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #131921;">Order Confirmation</h1>
+            <p>Hello ${user.name},</p>
+            <p>Thank you for shopping with us. We've received your order.</p>
+            
+            <div style="background-color: #f0f2f2; padding: 15px; margin: 20px 0; border-radius: 4px;">
+              <p style="margin: 0; font-weight: bold;">Order #${orderResult.rows[0].id}</p>
+              <p style="margin: 5px 0;">Total: $${parseFloat(totalPrice).toFixed(2)}</p>
+            </div>
+
+            <h3>Order Details:</h3>
+            <ul>
+              ${orderItems.map(item => `
+                <li>
+                  ${item.quantity}x ${item.name} - $${item.price.toFixed(2)}
+                </li>
+              `).join('')}
+            </ul>
+
+            <p style="margin-top: 20px; color: #565959;">
+              We'll send a confirmation when your items ship.
+            </p>
+          </div>
+        `;
+
+        const sendEmail = require('../utils/email');
+        await sendEmail({
+          email: user.email,
+          subject: `Your Amazon Clone Order #${orderResult.rows[0].id}`,
+          message
+        });
+      }
+    } catch (emailError) {
+      console.error('Failed to send confirmation email:', emailError);
+      // Continue execution, do not fail order for email error
+    }
+
     res.status(201).json({
       message: 'Order placed successfully',
       order: orderResult.rows[0],

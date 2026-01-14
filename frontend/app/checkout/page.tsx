@@ -6,7 +6,7 @@ import Header from '@/components/Header';
 import { useNotification } from '@/hooks/useNotification';
 import { formatCurrencyWithCommas } from '@/lib/currency';
 import SignInPrompt from '@/components/SignInPrompt';
-import { getBaseURL } from '@/lib/api';
+import { getBaseURL, cartApi, orderApi } from '@/lib/api';
 
 export default function Checkout() {
   const router = useRouter();
@@ -27,20 +27,30 @@ export default function Checkout() {
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
   const { showNotification, NotificationComponent } = useNotification();
 
-  // Use localStorage for cart
-  const fetchCart = () => {
+  // Fetch cart
+  const fetchCart = async () => {
     try {
-      const cartData = localStorage.getItem('cart');
-      if (cartData) {
-        const cart = JSON.parse(cartData);
-        setCart(cart);
-        const count = cart.items?.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0) || 0;
-        setCartCount(count);
-      } else {
-        setCart({ items: [] });
-        setCartCount(0);
-      }
+      const data = await cartApi.getCart();
+      const items = data.cart || [];
+      const formattedItems = items.map((item: any) => ({
+        ...item,
+        _id: item.product_id, // Match frontend expected ID for product
+        id: item.id, // Cart item ID
+        // Backend returns joined fields directly on the item
+        product: {
+          _id: item.product_id,
+          name: item.name,
+          price: Number(item.price), // Ensure number
+          images: item.images,
+          stock_quantity: item.stock_quantity
+        }
+      }));
+      setCart({ items: formattedItems });
+
+      const count = formattedItems.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0);
+      setCartCount(count);
     } catch (err) {
+      console.error('Failed to fetch cart:', err);
       setCart({ items: [] });
       setCartCount(0);
     } finally {
@@ -50,64 +60,20 @@ export default function Checkout() {
 
   useEffect(() => {
     fetchCart();
-    checkAuth();
-    
-    // Listen for storage changes (after login)
-    const handleStorageChange = () => {
-      checkAuth();
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('userLoggedIn', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('userLoggedIn', handleStorageChange);
-    };
+    // Default auth check - relying on backend default user
+    setIsAuthenticated(true);
   }, []);
-
-  // Check auth using localStorage only (no API)
-  const checkAuth = () => {
-    try {
-      const token = localStorage.getItem('token');
-      const userData = localStorage.getItem('user');
-      if (token && userData) {
-        const user = JSON.parse(userData);
-        if (user && user._id && user._id !== 'default-user-id') {
-          setIsAuthenticated(true);
-        }
-      }
-    } catch (err) {
-      // Silent error handling
-    }
-  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    
-    if (!address.fullName.trim()) {
-      newErrors.fullName = 'Full name is required';
-    }
-    if (!address.address.trim()) {
-      newErrors.address = 'Address is required';
-    }
-    if (!address.city.trim()) {
-      newErrors.city = 'City is required';
-    }
-    if (!address.state.trim()) {
-      newErrors.state = 'State is required';
-    }
-    if (!address.zipCode.trim()) {
-      newErrors.zipCode = 'Zip code is required';
-    }
-    if (!address.phone.trim()) {
-      newErrors.phone = 'Phone number is required';
-    } else if (!/^\d{10,}$/.test(address.phone.replace(/\D/g, ''))) {
-      newErrors.phone = 'Please enter a valid phone number';
-    }
-    if (!address.country.trim()) {
-      newErrors.country = 'Country is required';
-    }
+    if (!address.fullName.trim()) newErrors.fullName = 'Full name is required';
+    if (!address.address.trim()) newErrors.address = 'Address is required';
+    if (!address.city.trim()) newErrors.city = 'City is required';
+    if (!address.state.trim()) newErrors.state = 'State is required';
+    if (!address.zipCode.trim()) newErrors.zipCode = 'Zip code is required';
+    if (!address.phone.trim()) newErrors.phone = 'Phone number is required';
+    else if (!/^\d{10,}$/.test(address.phone.replace(/\D/g, ''))) newErrors.phone = 'Please enter a valid phone number';
+    if (!address.country.trim()) newErrors.country = 'Country is required';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -115,142 +81,34 @@ export default function Checkout() {
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!validateForm()) {
       showNotification('Please fill in all required fields correctly', 'error');
       return;
     }
-    
-    // Check if user is authenticated
-    if (!isAuthenticated) {
-      showNotification('Please sign in to place your order', 'error');
-      // Redirect to login page with return URL
-      router.push('/login?redirect=/checkout');
-      return;
-    }
-    
+
     await proceedWithOrder();
   };
 
   const proceedWithOrder = async () => {
     try {
-      const cartData = localStorage.getItem('cart');
-      if (!cartData) {
-        showNotification('Cart is empty', 'error');
-        return;
-      }
+      // Create order via API
+      const response = await orderApi.placeOrder(address);
+      const order = response.order;
 
-      const cart = JSON.parse(cartData);
-      const cartItems = cart.items || [];
-      
-      if (cartItems.length === 0) {
-        showNotification('Cart is empty', 'error');
-        return;
-      }
-
-      // Calculate totals
-      const subtotal = cartItems.reduce((acc: number, item: any) => {
-        return acc + (item.price * (item.quantity || 0));
-      }, 0);
-      const tax = subtotal * 0.1;
-      const shipping = subtotal > 100 ? 0 : 10;
-      const totalPrice = subtotal + tax + shipping;
-
-      // Create order
-      const order = {
-        _id: `order-${Date.now()}-${Math.random()}`,
-        orderItems: cartItems.map((item: any) => ({
-          product: item,
-          quantity: item.quantity,
-          price: item.price
-        })),
-        shippingAddress: address,
-        totalPrice: totalPrice,
-        status: 'Processing',
-        createdAt: new Date().toISOString(),
-      };
-
-      // Save order to localStorage
-      const ordersData = localStorage.getItem('orders');
-      const orders = ordersData ? JSON.parse(ordersData) : [];
-      orders.unshift(order); // Add to beginning
-      localStorage.setItem('orders', JSON.stringify(orders));
-
-      // Clear cart
-      localStorage.setItem('cart', JSON.stringify({ items: [] }));
-      window.dispatchEvent(new Event('cartUpdated'));
-
-      // Show success message immediately (order was placed successfully)
+      // Show success message
       showNotification('Order placed successfully!', 'success');
 
-      // Send order confirmation email in background (non-blocking)
-      // This won't block the order if email fails
+      // Dispatch cart update
+      window.dispatchEvent(new Event('cartUpdated'));
+
+      // Redirect to confirmation
       setTimeout(() => {
-        const sendOrderEmail = async () => {
-          try {
-            const userData = localStorage.getItem('user');
-            if (!userData) return;
-            
-            const user = JSON.parse(userData);
-            const userEmail = user?.email;
-            
-            if (!userEmail) return;
-
-            // Try to send email via backend API (non-blocking)
-            // Use fetch with timeout controller for better compatibility
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-
-            try {
-              const apiUrl = `${getBaseURL()}/email/send-order-confirmation`;
-              const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  email: userEmail,
-                  order: order
-                }),
-                signal: controller.signal
-              });
-
-              clearTimeout(timeoutId);
-
-              if (response.ok) {
-                console.log('Order confirmation email sent successfully');
-              } else {
-                throw new Error('Email service returned error');
-              }
-            } catch (fetchError: any) {
-              clearTimeout(timeoutId);
-              throw fetchError;
-            }
-          } catch (emailError: any) {
-            // Email failed silently - order was still placed successfully
-            // Backend might not be running, which is okay - order still works with localStorage
-            // Only log if it's not a network/abort error
-            if (emailError.name !== 'AbortError' && 
-                !emailError.message?.includes('fetch') && 
-                !emailError.message?.includes('Failed to fetch') &&
-                !emailError.message?.includes('NetworkError')) {
-              console.log('Email service error:', emailError.message);
-            }
-            // Don't show error to user - order was successful
-          }
-        };
-
-        // Send email in background without blocking UI
-        sendOrderEmail().catch(() => {
-          // Silently handle any email errors - order was already successful
-        });
-      }, 100); // Small delay to let order complete first
-
-      setTimeout(() => {
-        router.push(`/order-confirmation?orderId=${order._id}`);
+        router.push(`/order-confirmation?orderId=${order.id || order._id}`);
       }, 1000);
+
     } catch (err: any) {
-      showNotification('Failed to place order', 'error');
+      console.error('Failed to place order:', err);
+      showNotification(err.response?.data?.message || 'Failed to place order', 'error');
     }
   };
 
@@ -263,11 +121,11 @@ export default function Checkout() {
   }
 
   const cartItems = cart?.items || [];
-  
+
   if (cartItems.length === 0) {
     return (
       <div className="min-h-screen bg-gray-100">
-        <Header cartCount={0} onSearch={() => {}} />
+        <Header cartCount={0} onSearch={() => { }} />
         <div className="container mx-auto px-4 py-8 text-center">
           <h2 className="text-2xl font-medium mb-4">Your cart is empty</h2>
           <Link href="/" className="text-blue-600 hover:underline">
@@ -296,7 +154,7 @@ export default function Checkout() {
         onClose={() => setShowSignInPrompt(false)}
         redirectUrl="/checkout"
       />
-      <Header cartCount={cartCount} onSearch={() => {}} />
+      <Header cartCount={cartCount} onSearch={() => { }} />
 
       <main className="container mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8">
         <div className="lg:w-3/4">
@@ -307,33 +165,31 @@ export default function Checkout() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-bold mb-1 text-gray-900">Full name (First and Last name)</label>
-                  <input 
+                  <input
                     required
-                    type="text" 
-                    className={`w-full border border-gray-400 p-2.5 rounded focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all ${
-                      errors.fullName ? 'border-red-500' : ''
-                    }`}
+                    type="text"
+                    className={`w-full border border-gray-400 p-2.5 rounded focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all ${errors.fullName ? 'border-red-500' : ''
+                      }`}
                     value={address.fullName}
                     onChange={(e) => {
-                      setAddress({...address, fullName: e.target.value});
-                      if (errors.fullName) setErrors({...errors, fullName: ''});
+                      setAddress({ ...address, fullName: e.target.value });
+                      if (errors.fullName) setErrors({ ...errors, fullName: '' });
                     }}
                   />
                   {errors.fullName && <p className="text-red-500 text-xs mt-1">{errors.fullName}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-bold mb-1">Address</label>
-                  <input 
+                  <input
                     required
-                    type="text" 
+                    type="text"
                     placeholder="Street address or P.O. Box"
-                    className={`w-full border p-2 rounded focus:ring-yellow-500 focus:border-yellow-500 ${
-                      errors.address ? 'border-red-500' : ''
-                    }`}
+                    className={`w-full border p-2 rounded focus:ring-yellow-500 focus:border-yellow-500 ${errors.address ? 'border-red-500' : ''
+                      }`}
                     value={address.address}
                     onChange={(e) => {
-                      setAddress({...address, address: e.target.value});
-                      if (errors.address) setErrors({...errors, address: ''});
+                      setAddress({ ...address, address: e.target.value });
+                      if (errors.address) setErrors({ ...errors, address: '' });
                     }}
                   />
                   {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
@@ -341,48 +197,45 @@ export default function Checkout() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-bold mb-1">City</label>
-                    <input 
+                    <input
                       required
-                      type="text" 
-                      className={`w-full border p-2 rounded focus:ring-yellow-500 focus:border-yellow-500 ${
-                        errors.city ? 'border-red-500' : ''
-                      }`}
+                      type="text"
+                      className={`w-full border p-2 rounded focus:ring-yellow-500 focus:border-yellow-500 ${errors.city ? 'border-red-500' : ''
+                        }`}
                       value={address.city}
                       onChange={(e) => {
-                        setAddress({...address, city: e.target.value});
-                        if (errors.city) setErrors({...errors, city: ''});
+                        setAddress({ ...address, city: e.target.value });
+                        if (errors.city) setErrors({ ...errors, city: '' });
                       }}
                     />
                     {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-bold mb-1">State</label>
-                    <input 
+                    <input
                       required
-                      type="text" 
-                      className={`w-full border p-2 rounded focus:ring-yellow-500 focus:border-yellow-500 ${
-                        errors.state ? 'border-red-500' : ''
-                      }`}
+                      type="text"
+                      className={`w-full border p-2 rounded focus:ring-yellow-500 focus:border-yellow-500 ${errors.state ? 'border-red-500' : ''
+                        }`}
                       value={address.state}
                       onChange={(e) => {
-                        setAddress({...address, state: e.target.value});
-                        if (errors.state) setErrors({...errors, state: ''});
+                        setAddress({ ...address, state: e.target.value });
+                        if (errors.state) setErrors({ ...errors, state: '' });
                       }}
                     />
                     {errors.state && <p className="text-red-500 text-xs mt-1">{errors.state}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-bold mb-1">Zip Code</label>
-                    <input 
+                    <input
                       required
-                      type="text" 
-                      className={`w-full border p-2 rounded focus:ring-yellow-500 focus:border-yellow-500 ${
-                        errors.zipCode ? 'border-red-500' : ''
-                      }`}
+                      type="text"
+                      className={`w-full border p-2 rounded focus:ring-yellow-500 focus:border-yellow-500 ${errors.zipCode ? 'border-red-500' : ''
+                        }`}
                       value={address.zipCode}
                       onChange={(e) => {
-                        setAddress({...address, zipCode: e.target.value});
-                        if (errors.zipCode) setErrors({...errors, zipCode: ''});
+                        setAddress({ ...address, zipCode: e.target.value });
+                        if (errors.zipCode) setErrors({ ...errors, zipCode: '' });
                       }}
                     />
                     {errors.zipCode && <p className="text-red-500 text-xs mt-1">{errors.zipCode}</p>}
@@ -390,28 +243,27 @@ export default function Checkout() {
                 </div>
                 <div>
                   <label className="block text-sm font-bold mb-1">Phone Number</label>
-                  <input 
+                  <input
                     required
-                    type="tel" 
-                    className={`w-full border p-2 rounded focus:ring-yellow-500 focus:border-yellow-500 ${
-                      errors.phone ? 'border-red-500' : ''
-                    }`}
+                    type="tel"
+                    className={`w-full border p-2 rounded focus:ring-yellow-500 focus:border-yellow-500 ${errors.phone ? 'border-red-500' : ''
+                      }`}
                     value={address.phone}
                     onChange={(e) => {
-                      setAddress({...address, phone: e.target.value});
-                      if (errors.phone) setErrors({...errors, phone: ''});
+                      setAddress({ ...address, phone: e.target.value });
+                      if (errors.phone) setErrors({ ...errors, phone: '' });
                     }}
                   />
                   {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-bold mb-1">Country</label>
-                  <input 
+                  <input
                     required
-                    type="text" 
+                    type="text"
                     className="w-full border p-2 rounded focus:ring-yellow-500 focus:border-yellow-500"
                     value={address.country}
-                    onChange={(e) => setAddress({...address, country: e.target.value})}
+                    onChange={(e) => setAddress({ ...address, country: e.target.value })}
                   />
                 </div>
               </div>
@@ -436,7 +288,7 @@ export default function Checkout() {
                       <li>Save multiple addresses</li>
                       <li>View order history</li>
                     </ul>
-                    <Link 
+                    <Link
                       href={`/login?redirect=${encodeURIComponent('/checkout')}`}
                       className="text-sm text-blue-600 hover:text-orange-600 hover:underline font-medium transition-colors"
                     >
@@ -465,39 +317,26 @@ export default function Checkout() {
                   const productId = isProductObject ? product._id : null;
                   const maxQuantity = isProductObject ? Math.min(product.stock_quantity || 10, 10) : 10;
 
-                  const handleQuantityChange = (newQuantity: number) => {
+                  const handleQuantityChange = async (newQuantity: number) => {
                     if (newQuantity <= 0) {
-                      handleRemoveFromCart(item._id);
+                      handleRemoveFromCart(item.id); // Use cart item ID
                     } else {
                       try {
-                        const cartData = localStorage.getItem('cart');
-                        if (!cartData) return;
-
-                        let cart = JSON.parse(cartData);
-                        const itemIndex = cart.items.findIndex((i: any) => i._id === item._id);
-                        if (itemIndex >= 0) {
-                          cart.items[itemIndex].quantity = newQuantity;
-                          localStorage.setItem('cart', JSON.stringify(cart));
-                          window.dispatchEvent(new Event('cartUpdated'));
-                          fetchCart();
-                          showNotification('Cart updated', 'success');
-                        }
+                        await cartApi.updateQuantity(item.id, newQuantity);
+                        showNotification('Cart updated', 'success');
+                        window.dispatchEvent(new Event('cartUpdated'));
+                        fetchCart();
                       } catch (err: any) {
                         showNotification('Failed to update quantity', 'error');
                       }
                     }
                   };
 
-                  const handleRemoveFromCart = (itemId: string) => {
+                  const handleRemoveFromCart = async (itemId: string) => {
                     try {
-                      const cartData = localStorage.getItem('cart');
-                      if (!cartData) return;
-
-                      let cart = JSON.parse(cartData);
-                      cart.items = cart.items.filter((i: any) => i._id !== itemId);
-                      localStorage.setItem('cart', JSON.stringify(cart));
-                      window.dispatchEvent(new Event('cartUpdated'));
+                      await cartApi.removeFromCart(itemId);
                       showNotification('Item removed from cart', 'success');
+                      window.dispatchEvent(new Event('cartUpdated'));
                       fetchCart();
                     } catch (err: any) {
                       showNotification('Failed to remove item', 'error');
@@ -507,11 +346,17 @@ export default function Checkout() {
                   return (
                     <div key={item._id} className="flex gap-4 pb-4 border-b border-gray-200 last:border-b-0">
                       <Link href={productId ? `/product/${productId}` : '#'} className="flex-shrink-0">
-                        <img 
-                          src={productImage} 
-                          alt={productName} 
-                          className="w-20 h-20 object-contain bg-white rounded border border-gray-200" 
+                        <img
+                          src={productImage}
+                          alt={productName}
+                          className="w-20 h-20 object-contain bg-white rounded border border-gray-200"
                           loading="lazy"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.onerror = null;
+                            target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNFRUU4QUEiIC8+PHRleHQgeD0iNTAiIHk9IjUwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM1NTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBOb3QgRnVuZDwvdGV4dD48L3N2Zz4=';
+                          }}
                         />
                       </Link>
                       <div className="flex-1 min-w-0">
@@ -543,7 +388,7 @@ export default function Checkout() {
                             </div>
                           </div>
                           <button
-                            onClick={() => handleRemoveFromCart(item._id)}
+                            onClick={() => handleRemoveFromCart(item.id)}
                             className="text-blue-600 hover:text-red-600 hover:underline text-sm font-medium transition-colors"
                           >
                             Delete
@@ -560,8 +405,8 @@ export default function Checkout() {
             </div>
 
             <div className="lg:hidden mt-6">
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="w-full bg-yellow-400 hover:bg-yellow-500 rounded-md py-3 shadow font-medium"
               >
                 Place your order
@@ -569,11 +414,11 @@ export default function Checkout() {
             </div>
           </form>
         </div>
-        
+
         {/* Sidebar Summary */}
         <div className="lg:w-1/4">
           <div className="bg-white border rounded-md p-6 sticky top-4 shadow-sm">
-            <button 
+            <button
               onClick={handlePlaceOrder}
               className="w-full bg-yellow-400 hover:bg-yellow-500 rounded-md py-2 shadow-sm text-sm font-medium mb-4"
             >
@@ -584,7 +429,7 @@ export default function Checkout() {
               <span className="text-blue-600 cursor-pointer hover:underline">privacy notice</span> and{' '}
               <span className="text-blue-600 cursor-pointer hover:underline">conditions of use</span>.
             </p>
-            
+
             <h3 className="font-bold mb-3">Order Summary</h3>
             <div className="space-y-2 text-sm mb-3">
               <div className="flex justify-between">

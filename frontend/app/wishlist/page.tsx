@@ -6,6 +6,7 @@ import { Heart, ShoppingCart } from 'lucide-react';
 import ProductCard from '@/components/ProductCard';
 import { useNotification } from '@/hooks/useNotification';
 import { formatCurrencyWithCommas } from '@/lib/currency';
+import { cartApi, wishlistApi } from '@/lib/api';
 
 export default function Wishlist() {
   const [wishlist, setWishlist] = useState<any>(null);
@@ -13,76 +14,51 @@ export default function Wishlist() {
   const [cartCount, setCartCount] = useState(0);
   const { showNotification, NotificationComponent } = useNotification();
 
-  // Use localStorage for wishlist
-  const fetchWishlist = () => {
+  // Fetch wishlist from API
+  const fetchWishlist = async () => {
     try {
-      const wishlistData = localStorage.getItem('wishlist');
-      if (wishlistData) {
-        const wishlist = JSON.parse(wishlistData);
-        setWishlist(wishlist);
-      } else {
-        setWishlist({ products: [] });
-      }
+      const data = await wishlistApi.getWishlist();
+      // The backend returns { wishlist: [...] } where items contain product details
+      setWishlist({ products: data.wishlist || [] });
     } catch (err) {
+      console.error('Failed to fetch wishlist:', err);
       setWishlist({ products: [] });
     } finally {
       setLoading(false);
     }
   };
 
-  // Use localStorage for cart
-  const fetchCart = () => {
+  // Fetch cart from API
+  const fetchCart = async () => {
     try {
-      const cartData = localStorage.getItem('cart');
-      if (cartData) {
-        const cart = JSON.parse(cartData);
-        const count = cart.items?.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0) || 0;
-        setCartCount(count);
-      } else {
-        setCartCount(0);
-      }
+      const data = await cartApi.getCart();
+      const items = data.cart || [];
+      const count = items.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0);
+      setCartCount(count);
     } catch (err) {
       setCartCount(0);
     }
   };
 
-  const handleRemoveFromWishlist = (productId: string) => {
+  const handleRemoveFromWishlist = async (productId: string) => {
     try {
-      const wishlistData = localStorage.getItem('wishlist');
-      if (wishlistData) {
-        const wishlist = JSON.parse(wishlistData);
-        wishlist.products = wishlist.products.filter((p: any) => {
-          const id = typeof p === 'string' ? p : p._id;
-          return id !== productId;
-        });
-        localStorage.setItem('wishlist', JSON.stringify(wishlist));
-        window.dispatchEvent(new Event('wishlistUpdated'));
-        showNotification('Removed from wishlist', 'success');
-        fetchWishlist();
-      }
+      // The ID passed here is the PRODUCT ID (from productData._id or similar)
+      const idStr = String(productId);
+      await wishlistApi.removeFromWishlist(idStr);
+      window.dispatchEvent(new Event('wishlistUpdated'));
+      showNotification('Removed from wishlist', 'success');
+      fetchWishlist();
     } catch (err: any) {
       showNotification('Failed to remove from wishlist', 'error');
     }
   };
 
-  const handleAddToCart = (product: any) => {
+  const handleAddToCart = async (product: any) => {
     try {
-      const cartData = localStorage.getItem('cart');
-      let cart = cartData ? JSON.parse(cartData) : { items: [] };
-      
-      const existingItemIndex = cart.items.findIndex((item: any) => item.product._id === product._id);
-      
-      if (existingItemIndex >= 0) {
-        cart.items[existingItemIndex].quantity += 1;
-      } else {
-        cart.items.push({
-          _id: `item-${Date.now()}-${Math.random()}`,
-          product: product,
-          quantity: 1
-        });
-      }
-      
-      localStorage.setItem('cart', JSON.stringify(cart));
+      // Use product_id or id from the object
+      const productId = String(product.product_id || product.id || product._id);
+      await cartApi.addToCart(productId, 1);
+
       window.dispatchEvent(new Event('cartUpdated'));
       fetchCart();
       showNotification(`${product.name} added to cart!`, 'success');
@@ -94,7 +70,7 @@ export default function Wishlist() {
   useEffect(() => {
     fetchWishlist();
     fetchCart();
-    
+
     // Listen for wishlist and cart updates
     const handleWishlistUpdate = () => {
       fetchWishlist();
@@ -102,10 +78,10 @@ export default function Wishlist() {
     const handleCartUpdate = () => {
       fetchCart();
     };
-    
+
     window.addEventListener('wishlistUpdated', handleWishlistUpdate);
     window.addEventListener('cartUpdated', handleCartUpdate);
-    
+
     return () => {
       window.removeEventListener('wishlistUpdated', handleWishlistUpdate);
       window.removeEventListener('cartUpdated', handleCartUpdate);
@@ -125,7 +101,7 @@ export default function Wishlist() {
   return (
     <div className="min-h-screen bg-gray-100 font-sans">
       {NotificationComponent}
-      <Header cartCount={cartCount} onSearch={() => {}} />
+      <Header cartCount={cartCount} onSearch={() => { }} />
 
       <main className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-medium mb-6">Your Wishlist</h1>
@@ -143,43 +119,47 @@ export default function Wishlist() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {products.map((product: any) => {
+            {products.map((product: any, idx: number) => {
               const productData = product && typeof product === 'object' && product !== null ? product : null;
               if (!productData) return null;
 
               return (
-                <div key={productData._id} className="bg-white p-4 border border-gray-200 rounded-lg flex flex-col h-full hover:shadow-xl transition-all duration-200 relative group">
+                <div key={productData.id || productData._id || idx} className="bg-white p-4 border border-gray-200 rounded-lg flex flex-col h-full hover:shadow-xl transition-all duration-200 relative group">
                   <button
-                    onClick={() => handleRemoveFromWishlist(productData._id)}
+                    onClick={() => handleRemoveFromWishlist(String(productData.id || productData._id || productData.product_id))}
                     className="absolute top-3 right-3 z-10 p-2 rounded-full bg-white/90 backdrop-blur-sm shadow-lg hover:bg-gray-100 transition-all"
                     aria-label="Remove from wishlist"
                   >
                     <Heart className="w-5 h-5 fill-red-500 text-red-500" />
                   </button>
 
-                  <Link href={`/product/${productData._id}`} className="flex-1 flex flex-col items-center justify-center p-4 bg-white mb-3 min-h-[200px] group/image">
-                    <img 
-                      src={productData.images && productData.images.length > 0 
-                        ? productData.images[0] 
-                        : 'https://via.placeholder.com/300x300?text=No+Image'} 
-                      alt={productData.name} 
+                  <Link href={`/product/${productData.id || productData._id || productData.product_id}`} className="flex-1 flex flex-col items-center justify-center p-4 bg-white mb-3 min-h-[200px] group/image">
+                    <img
+                      src={productData.images?.[0] || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNFRUU4QUEiIC8+PHRleHQgeD0iNTAiIHk9IjUwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM1NTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBOb3QgRnVuZDwvdGV4dD48L3N2Zz4='}
+                      alt={productData.name}
                       className="max-h-48 w-full object-contain transition-transform duration-300 group-hover/image:scale-105"
                       loading="lazy"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNFRUU4QUEiIC8+PHRleHQgeD0iNTAiIHk9IjUwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM1NTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBOb3QgRnVuZDwvdGV4dD48L3N2Zz4=';
+                      }}
                     />
                   </Link>
-                  
+
                   <div className="flex flex-col gap-1.5">
                     <Link href={`/product/${productData._id}`} className="hover:text-orange-600 transition-colors">
                       <h2 className="font-medium line-clamp-2 text-sm md:text-base leading-tight text-gray-900 group-hover:text-orange-600">
                         {productData.name}
                       </h2>
                     </Link>
-                    
+
                     <div className="flex items-baseline gap-1 mt-1">
                       <span className="text-lg md:text-xl font-bold text-red-700">{formatCurrencyWithCommas(productData.price)}</span>
                     </div>
-                    
-                    <button 
+
+                    <button
                       onClick={() => handleAddToCart(productData)}
                       disabled={productData.stock_quantity === 0}
                       className="bg-yellow-400 hover:bg-yellow-500 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md py-2 px-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:ring-offset-2 mt-auto border border-yellow-600 shadow-sm transition-all duration-200 active:scale-95 flex items-center justify-center gap-2"

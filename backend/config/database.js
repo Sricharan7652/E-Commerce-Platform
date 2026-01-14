@@ -1,14 +1,17 @@
-const mongoose = require('mongoose');
+const { Pool } = require('pg');
 require('dotenv').config();
 
-const connectDB = async () => {
-  try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI);
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
-  } catch (error) {
-    console.error('MongoDB connection error:', error);
-    process.exit(1);
-  }
-};
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/amazon_clone',
+});
 
-module.exports = connectDB;
+// Test the connection
+pool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    console.error('Database connection error:', err);
+  } else {
+    console.log('Database connected successfully');
+  }
+});
+
+module.exports = pool;

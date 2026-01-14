@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Header from '@/components/Header';
 import Link from 'next/link';
 import { Heart } from 'lucide-react';
@@ -8,10 +8,11 @@ import { useNotification } from '@/hooks/useNotification';
 import { formatCurrencyWithCommas } from '@/lib/currency';
 import { useAmazonToast } from '@/hooks/useAmazonToast';
 import { useCartSidebar } from '@/hooks/useCartSidebar';
-import { productApi } from '@/lib/api';
+import { productApi, cartApi } from '@/lib/api';
 
-export default function ProductDetailClient({ params }: { params: { id: string } }) {
+export default function ProductDetailClient() {
   const router = useRouter();
+  const params = useParams(); // Use useParams hook
   const [product, setProduct] = useState<any>(null);
   const [cartCount, setCartCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -25,11 +26,13 @@ export default function ProductDetailClient({ params }: { params: { id: string }
   // Use API to fetch product
   const fetchProduct = async () => {
     try {
-      const productId = params.id as string;
+      const productId = params?.id as string;
+      if (!productId) return; // Wait for params
+
       console.log('Fetching product with ID:', productId);
       const response = await productApi.getProductById(productId);
       console.log('API response:', response);
-      
+
       // API returns {product: {...}} structure
       if (response && response.product) {
         console.log('Setting product:', response.product);
@@ -44,17 +47,13 @@ export default function ProductDetailClient({ params }: { params: { id: string }
     }
   };
 
-  // Use localStorage for cart
-  const fetchCart = () => {
+  // Fetch cart count
+  const fetchCartCount = async () => {
     try {
-      const cartData = localStorage.getItem('cart');
-      if (cartData) {
-        const cart = JSON.parse(cartData);
-        const count = cart.items?.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0) || 0;
-        setCartCount(count);
-      } else {
-        setCartCount(0);
-      }
+      const data = await cartApi.getCart();
+      const items = data.cart || [];
+      const count = items.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0);
+      setCartCount(count);
     } catch (err) {
       setCartCount(0);
     }
@@ -66,7 +65,7 @@ export default function ProductDetailClient({ params }: { params: { id: string }
       const wishlistData = localStorage.getItem('wishlist');
       if (wishlistData) {
         const wishlist = JSON.parse(wishlistData);
-        const productIds = wishlist.products.map((p: any) => 
+        const productIds = wishlist.products.map((p: any) =>
           typeof p === 'string' ? p : p._id
         );
         setIsInWishlist(productIds.includes(params.id));
@@ -78,55 +77,32 @@ export default function ProductDetailClient({ params }: { params: { id: string }
     }
   };
 
-  // Add to cart using localStorage
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!product) return;
     try {
-      const cartData = localStorage.getItem('cart');
-      let cart = cartData ? JSON.parse(cartData) : { items: [] };
-      
-      const existingItemIndex = cart.items.findIndex((item: any) => item._id === product._id);
-      
-      if (existingItemIndex >= 0) {
-        cart.items[existingItemIndex].quantity += quantity;
-      } else {
-        cart.items.push({
-          ...product,
-          quantity: quantity
-        });
-      }
-      
-      localStorage.setItem('cart', JSON.stringify(cart));
+      await cartApi.addToCart(product._id || product.id, quantity);
+
+      // Update local state
+      await fetchCartCount();
+
       window.dispatchEvent(new Event('cartUpdated'));
-      fetchCart();
       showToast('Added to Cart');
-      showCartSidebar(); // Show cart sidebar
+      showCartSidebar();
     } catch (err: any) {
-      showNotification('Failed to add to cart', 'error');
+      console.error('Failed to add to cart:', err);
+      showNotification('Failed to add to cart. Ensure backend is running.', 'error');
     }
   };
 
   // Buy now - add to cart and go to checkout
-  const handleBuyNow = () => {
+  const handleBuyNow = async () => {
     if (!product) return;
     try {
-      const cartData = localStorage.getItem('cart');
-      let cart = cartData ? JSON.parse(cartData) : { items: [] };
-      
-      const existingItemIndex = cart.items.findIndex((item: any) => item._id === product._id);
-      
-      if (existingItemIndex >= 0) {
-        cart.items[existingItemIndex].quantity += quantity;
-      } else {
-        cart.items.push({
-          ...product,
-          quantity: quantity
-        });
-      }
-      
-      localStorage.setItem('cart', JSON.stringify(cart));
+      await cartApi.addToCart(product._id || product.id, quantity);
+
       window.dispatchEvent(new Event('cartUpdated'));
-      fetchCart();
+      await fetchCartCount();
+
       showNotification('Redirecting to checkout...', 'info');
       setTimeout(() => {
         router.push('/checkout');
@@ -142,7 +118,7 @@ export default function ProductDetailClient({ params }: { params: { id: string }
     try {
       const wishlistData = localStorage.getItem('wishlist');
       let wishlist = wishlistData ? JSON.parse(wishlistData) : { products: [] };
-      
+
       if (isInWishlist) {
         wishlist.products = wishlist.products.filter((p: any) => {
           const id = typeof p === 'string' ? p : p._id;
@@ -153,7 +129,7 @@ export default function ProductDetailClient({ params }: { params: { id: string }
         wishlist.products.push(product);
         setIsInWishlist(true);
       }
-      
+
       localStorage.setItem('wishlist', JSON.stringify(wishlist));
       window.dispatchEvent(new Event('wishlistUpdated'));
     } catch (err) {
@@ -164,20 +140,20 @@ export default function ProductDetailClient({ params }: { params: { id: string }
   useEffect(() => {
     if (params.id) {
       fetchProduct();
-      fetchCart();
+      fetchCartCount();
       checkWishlist();
-      
+
       // Listen for cart and wishlist updates
       const handleCartUpdate = () => {
-        fetchCart();
+        fetchCartCount();
       };
       const handleWishlistUpdate = () => {
         checkWishlist();
       };
-      
+
       window.addEventListener('cartUpdated', handleCartUpdate);
       window.addEventListener('wishlistUpdated', handleWishlistUpdate);
-      
+
       return () => {
         window.removeEventListener('cartUpdated', handleCartUpdate);
         window.removeEventListener('wishlistUpdated', handleWishlistUpdate);
@@ -203,8 +179,8 @@ export default function ProductDetailClient({ params }: { params: { id: string }
 
   console.log('Product data:', product); // Debug log
 
-  const images = product.images && product.images.length > 0 
-    ? product.images 
+  const images = product.images && product.images.length > 0
+    ? product.images
     : ['https://via.placeholder.com/500x500?text=No+Image'];
 
   const renderStars = (rating: number) => {
@@ -225,165 +201,179 @@ export default function ProductDetailClient({ params }: { params: { id: string }
       {NotificationComponent}
       {ToastComponent}
       {CartSidebarComponent}
-      <Header cartCount={cartCount} onSearch={() => {}} />
+      <Header cartCount={cartCount} onSearch={() => { }} />
 
-      <main className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+      <main className="container mx-auto px-4 py-8 max-w-[1500px]">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
           {/* Image Carousel */}
           <div className="lg:col-span-2">
-            <div className="flex flex-col gap-4">
-              {/* Main Image */}
-              <div className="flex justify-center items-center bg-white p-8 rounded-lg border border-gray-200 shadow-sm min-h-[400px]">
-                <img 
-                  src={images[selectedImage]} 
-                  alt={product.name} 
-                  className="max-h-96 w-full object-contain transition-opacity duration-200"
-                  loading="eager"
-                />
-              </div>
-              
-              {/* Thumbnail Images */}
+            <div className="flex gap-4 sticky top-4 h-[500px]">
+              {/* Thumbnail List - Left Side */}
               {images.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto pb-2">
+                <div className="flex flex-col gap-3 overflow-y-auto w-16 h-full py-1 scrollbar-hide">
                   {images.map((img: string, idx: number) => (
                     <button
                       key={idx}
+                      onMouseEnter={() => setSelectedImage(idx)}
                       onClick={() => setSelectedImage(idx)}
-                      className={`flex-shrink-0 w-20 h-20 border-2 rounded overflow-hidden transition-all ${
-                        selectedImage === idx 
-                          ? 'border-yellow-500 shadow-md scale-105' 
-                          : 'border-gray-300 hover:border-gray-400'
-                      }`}
+                      className={`flex-shrink-0 w-14 h-18 border rounded-md overflow-hidden transition-all bg-white ${selectedImage === idx
+                        ? 'border-yellow-500 shadow-md ring-1 ring-yellow-500'
+                        : 'border-gray-300 hover:border-gray-400'
+                        }`}
                     >
-                      <img 
-                        src={img} 
-                        alt={`${product.name} ${idx + 1}`} 
-                        className="w-full h-full object-contain"
+                      <img
+                        src={img || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNFRUU4QUEiIC8+PHRleHQgeD0iNTAiIHk9IjUwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM1NTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBOb3QgRnVuZDwvdGV4dD48L3N2Zz4='}
+                        alt={`${product.name} ${idx + 1}`}
+                        className="w-full h-full object-contain p-0.5"
                         loading="lazy"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.onerror = null;
+                          target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNFRUU4QUEiIC8+PHRleHQgeD0iNTAiIHk9IjUwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM1NTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBOb3QgRnVuZDwvdGV4dD48L3N2Zz4=';
+                        }}
                       />
                     </button>
                   ))}
                 </div>
               )}
+
+              {/* Main Image - Right Side */}
+              <div className="flex-1 flex justify-center items-center bg-white rounded-lg border border-gray-100 h-full relative group cursor-crosshair">
+                <img
+                  src={images[selectedImage] || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNFRUU4QUEiIC8+PHRleHQgeD0iNTAiIHk9IjUwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM1NTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBOb3QgRnVuZDwvdGV4dD48L3N2Zz4='}
+                  alt={product.name}
+                  className="max-h-full max-w-full object-contain transition-opacity duration-200 p-4"
+                  loading="eager"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.onerror = null;
+                    target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNFRUU4QUEiIC8+PHRleHQgeD0iNTAiIHk9IjUwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM1NTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBOb3QgRnVuZDwvdGV4dD48L3N2Zz4=';
+                  }}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Product Details */}
-          <div className="lg:col-span-1 flex flex-col gap-4">
-            <h1 className="text-2xl md:text-3xl font-normal text-gray-900 leading-tight">{product.name}</h1>
-            
-            <div className="flex items-center gap-4">
-              {renderStars(product.rating || 0)}
-              <Link href="#reviews" className="text-blue-600 hover:text-orange-600 hover:underline text-sm transition-colors">
-                {product.numReviews || 0} ratings
+          {/* Product Details - Middle Column */}
+          <div className="lg:col-span-2 flex flex-col gap-4 px-2">
+            <h1 className="text-2xl md:text-3xl font-medium text-gray-900 leading-tight">{product.name}</h1>
+
+            <div className="flex items-center gap-4 text-sm">
+              <Link href="#reviews" className="flex items-center gap-1 hover:text-orange-600 transition-colors">
+                {renderStars(product.rating || 0)}
+                <span className="text-blue-600 ml-1 font-medium">{product.numReviews || 0} ratings</span>
               </Link>
             </div>
 
-            <hr className="my-2 border-gray-300" />
+            <div className="border-t border-gray-200 my-1"></div>
 
-            <div className="flex flex-col">
-              <span className="text-sm text-gray-500 mb-1">Price:</span>
-              <div className="flex items-baseline gap-1">
-                <span className="text-3xl font-bold text-red-700">{formatCurrencyWithCommas(product.price)}</span>
+            <div className="flex flex-col gap-2">
+              <div>
+                <span className="text-3xl font-medium text-gray-900"><sup className="text-sm top-[-0.5rem]">₹</sup>{formatCurrencyWithCommas(product.price).replace('₹', '')}</span>
+              </div>
+              <div className="text-sm text-gray-600">
+                Inclusive of all taxes
               </div>
             </div>
+
+            {/* Offers / Icons placeholder could go here */}
+
+            <div className="border-t border-gray-200 my-2"></div>
 
             {product.brand && (
-              <div className="text-sm">
-                <span className="font-bold">Brand:</span> {product.brand}
+              <div className="text-sm flex gap-4">
+                <span className="font-bold w-24">Brand</span>
+                <span>{product.brand}</span>
               </div>
             )}
 
-            <div className="text-sm text-gray-600">
-              <span className="font-bold">About this item:</span>
-              <p className="mt-2 whitespace-pre-line">{product.description}</p>
-            </div>
-
-            {/* Specifications */}
-            {product.specifications && Object.keys(product.specifications).length > 0 && (
-              <div className="mt-4">
-                <h3 className="font-bold mb-2">Specifications:</h3>
-                <div className="space-y-1 text-sm">
-                  {Object.entries(product.specifications).map(([key, value]: [string, any]) => (
-                    <div key={key} className="flex">
-                      <span className="font-medium w-32">{key}:</span>
-                      <span>{value}</span>
-                    </div>
-                  ))}
-                </div>
+            {product.category && (
+              <div className="text-sm flex gap-4">
+                <span className="font-bold w-24">Category</span>
+                <span>{product.category}</span>
               </div>
             )}
 
-            <div className={`text-sm font-medium ${product.stock_quantity > 0 ? 'text-green-700' : 'text-red-600'}`}>
-              {product.stock_quantity > 0 
-                ? `In Stock (${product.stock_quantity} available)` 
-                : 'Out of Stock'}
+            <div className="border-t border-gray-200 my-2"></div>
+
+            <div className="text-sm text-gray-900">
+              <h3 className="font-bold mb-2 text-base">About this item</h3>
+              <ul className="list-disc pl-5 space-y-1">
+                {/* Split description into list items if possible, else show paragraph */}
+                {product.description.split('. ').map((desc: string, i: number) => (
+                  desc.trim() && <li key={i}>{desc.trim()}.</li>
+                ))}
+              </ul>
             </div>
           </div>
 
-          {/* Buy Box */}
-          <div className="lg:col-span-1 border border-gray-300 rounded-lg p-6 h-fit shadow-md bg-white">
-            <div className="flex items-baseline gap-1 mb-4">
-              <span className="text-2xl md:text-3xl font-bold text-red-700">{formatCurrencyWithCommas(product.price)}</span>
-            </div>
-            
-            <div className="text-sm text-gray-600 mb-4">
-              {product.stock_quantity > 10 ? (
-                <span><span className="text-green-700 font-semibold">FREE delivery</span> <span className="font-bold">Tomorrow</span>.</span>
-              ) : product.stock_quantity > 0 ? (
-                <span>Only <span className="font-bold text-orange-600">{product.stock_quantity}</span> left in stock - order soon.</span>
-              ) : (
-                <span><span className="text-red-600 font-semibold">Currently unavailable</span></span>
-              )}
-            </div>
-
-            {product.stock_quantity > 0 && (
-              <div className="mb-4">
-                <label className="text-sm font-bold text-gray-900 block mb-2">Quantity:</label>
-                <select
-                  value={quantity}
-                  onChange={(e) => setQuantity(parseInt(e.target.value))}
-                  className="w-full border border-gray-400 rounded px-3 py-2 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white"
-                >
-                  {[...Array(Math.min(product.stock_quantity, 10))].map((_, i) => (
-                    <option key={i + 1} value={i + 1}>{i + 1}</option>
-                  ))}
-                </select>
+          {/* Buy Box - Right Column */}
+          <div className="lg:col-span-1">
+            <div className="border border-gray-300 rounded-lg p-5 shadow-sm bg-white sticky top-4">
+              <div className="flex items-baseline gap-1 mb-4">
+                <span className="text-2xl md:text-3xl font-bold text-red-700">{formatCurrencyWithCommas(product.price)}</span>
               </div>
-            )}
 
-            <div className="space-y-2 mb-4">
+              <div className="text-sm text-gray-600 mb-4">
+                {product.stock_quantity > 10 ? (
+                  <span><span className="text-green-700 font-semibold">FREE delivery</span> <span className="font-bold">Tomorrow</span>.</span>
+                ) : product.stock_quantity > 0 ? (
+                  <span>Only <span className="font-bold text-orange-600">{product.stock_quantity}</span> left in stock - order soon.</span>
+                ) : (
+                  <span><span className="text-red-600 font-semibold">Currently unavailable</span></span>
+                )}
+              </div>
+
+              {product.stock_quantity > 0 && (
+                <div className="mb-4">
+                  <label className="text-sm font-bold text-gray-900 block mb-2">Quantity:</label>
+                  <select
+                    value={quantity}
+                    onChange={(e) => setQuantity(parseInt(e.target.value))}
+                    className="w-full border border-gray-400 rounded px-2 py-1 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white"
+                  >
+                    {[...Array(Math.min(product.stock_quantity, 10))].map((_, i) => (
+                      <option key={i + 1} value={i + 1}>{i + 1}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="space-y-2 mb-4">
+                <button
+                  onClick={handleAddToCart}
+                  disabled={product.stock_quantity === 0}
+                  className="w-full bg-yellow-400 hover:bg-yellow-500 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-full py-2 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:ring-offset-2 transition-all duration-200 active:scale-95"
+                >
+                  Add to Cart
+                </button>
+
+                <button
+                  onClick={handleBuyNow}
+                  disabled={product.stock_quantity === 0}
+                  className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-full py-2 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all duration-200 active:scale-95"
+                >
+                  Buy Now
+                </button>
+              </div>
+
+              <div className="border-t border-gray-300 my-3"></div>
+
               <button
-                onClick={handleAddToCart}
-                disabled={product.stock_quantity === 0}
-                className="w-full bg-yellow-400 hover:bg-yellow-500 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:ring-offset-2 transition-all duration-200 active:scale-95"
+                onClick={toggleWishlist}
+                className="w-full border border-gray-300 rounded-md py-1.5 px-4 text-sm hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors"
               >
-                Add to Cart
+                <Heart className={`w-4 h-4 transition-all ${isInWishlist ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
+                {isInWishlist ? 'In Wishlist' : 'Add to Wish List'}
               </button>
-              
-              <button
-                onClick={handleBuyNow}
-                disabled={product.stock_quantity === 0}
-                className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-md py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all duration-200 active:scale-95"
-              >
-                Buy now
-              </button>
-            </div>
 
-            <div className="border-t border-gray-300 my-3"></div>
-
-            <button
-              onClick={toggleWishlist}
-              className="w-full border border-gray-300 rounded-md py-2.5 px-4 text-sm font-medium hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors"
-            >
-              <Heart className={`w-4 h-4 transition-all ${isInWishlist ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
-              {isInWishlist ? 'In Wishlist' : 'Add to Wish List'}
-            </button>
-
-            <div className="mt-4 text-xs text-gray-600 space-y-1">
-              <p className="font-medium">Ships from Amazon</p>
-              <p className="font-medium">Sold by Amazon</p>
-              <p className="text-blue-600 hover:text-orange-600 hover:underline cursor-pointer transition-colors">Add a gift receipt</p>
+              <div className="mt-4 text-xs text-gray-600 space-y-1">
+                <p className="flex justify-between"><span>Ships from</span> <span>Amazon</span></p>
+                <p className="flex justify-between"><span>Sold by</span> <span>Amazon</span></p>
+                <p className="text-blue-600 hover:text-orange-600 hover:underline cursor-pointer transition-colors pt-2">Add a gift receipt</p>
+              </div>
             </div>
           </div>
         </div>

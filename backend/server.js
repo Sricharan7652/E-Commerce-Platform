@@ -1,10 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-const connectDB = require('./config/database');
-
-// Connect to MongoDB
-connectDB();
+// Database connection is handled by the pool in config/database.js
+const pool = require('./config/database');
 
 const app = express();
 

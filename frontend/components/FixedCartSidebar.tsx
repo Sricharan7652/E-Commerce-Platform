@@ -2,99 +2,56 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { formatCurrencyWithCommas } from '@/lib/currency';
+import { cartApi } from '@/lib/api';
 
-export default function FixedCartSidebar() {
-  const [cart, setCart] = useState<any>(null);
-  const [isReady, setIsReady] = useState(false);
+interface FixedCartSidebarProps {
+  items: any[];
+}
 
-  const updateQuantity = (itemIndex: number, quantity: number) => {
+export default function FixedCartSidebar({ items = [] }: FixedCartSidebarProps) {
+  const isReady = true;
+
+  const updateQuantity = async (itemIndex: number, quantity: number) => {
     try {
-      const cartData = localStorage.getItem('cart');
-      if (!cartData) return;
+      const item = items[itemIndex];
+      if (!item) return;
 
-      let updatedCart = JSON.parse(cartData);
-
-      if (!Array.isArray(updatedCart.items)) {
-        updatedCart.items = [];
-      }
-
-      if (itemIndex < 0 || itemIndex >= updatedCart.items.length) return;
+      const itemId = item.id; // Cart item ID
 
       if (quantity <= 0) {
-        // Remove item when quantity goes to 0
-        updatedCart.items.splice(itemIndex, 1);
+        await cartApi.removeFromCart(itemId);
       } else {
-        updatedCart.items[itemIndex].quantity = quantity;
+        await cartApi.updateQuantity(itemId, quantity);
       }
 
-      localStorage.setItem('cart', JSON.stringify(updatedCart));
       window.dispatchEvent(new Event('cartUpdated'));
-      fetchCart();
     } catch (err) {
-      // Silent error handling
+      console.error('Failed to update quantity:', err);
     }
   };
 
-  const removeItem = (itemIndex: number) => {
+  const removeItem = async (itemIndex: number) => {
     try {
-      const cartData = localStorage.getItem('cart');
-      if (!cartData) return;
+      const item = items[itemIndex];
+      if (!item) return;
 
-      let updatedCart = JSON.parse(cartData);
+      const itemId = item.id;
 
-      if (!Array.isArray(updatedCart.items)) {
-        updatedCart.items = [];
-      }
-
-      if (itemIndex < 0 || itemIndex >= updatedCart.items.length) return;
-
-      updatedCart.items.splice(itemIndex, 1);
-
-      localStorage.setItem('cart', JSON.stringify(updatedCart));
+      await cartApi.removeFromCart(itemId);
       window.dispatchEvent(new Event('cartUpdated'));
-      fetchCart();
     } catch (err) {
-      // Silent error handling
+      console.error('Failed to remove item:', err);
     }
   };
 
-  const fetchCart = () => {
-    try {
-      const cartData = localStorage.getItem('cart');
-      if (cartData) {
-        setCart(JSON.parse(cartData));
-      } else {
-        setCart({ items: [] });
-      }
-    } catch (err) {
-      setCart({ items: [] });
-    }
-  };
-
-  useEffect(() => {
-    fetchCart();
-    setIsReady(true);
-    
-    // Listen for cart updates
-    const handleCartUpdate = () => {
-      fetchCart();
-    };
-    window.addEventListener('cartUpdated', handleCartUpdate);
-    return () => window.removeEventListener('cartUpdated', handleCartUpdate);
-  }, []);
-
-  const cartItems = cart?.items || [];
+  const cartItems = items;
   const totalItems = cartItems.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0);
   const subtotal = cartItems.reduce((acc: number, item: any) => {
     return acc + (item.price * (item.quantity || 0));
   }, 0);
 
-  // Hide the fixed sidebar when the cart is empty. We wait for first
-  // fetch to avoid hydration flicker.
-  if (!isReady || cartItems.length === 0) return null;
-
   return (
-    <div className="w-80 bg-white border-l border-gray-200 h-[calc(100vh-73px)] sticky top-[73px] flex flex-col overflow-hidden ml-auto">
+    <div className="w-80 bg-white border-l border-gray-200 h-[calc(100vh-100px)] sticky top-[100px] flex flex-col overflow-hidden ml-auto">
       {/* Cart Header */}
       <div className="bg-white border-b p-4 flex-shrink-0 z-10">
         <h3 className="text-base font-bold text-gray-900">Cart</h3>
@@ -108,7 +65,7 @@ export default function FixedCartSidebar() {
               const productImage = item.images && item.images.length > 0
                 ? item.images[0]
                 : 'https://via.placeholder.com/150?text=No+Image';
-              
+
               return (
                 <div
                   key={item._id || idx}
@@ -118,11 +75,16 @@ export default function FixedCartSidebar() {
                     href={`/product/${item._id}`}
                     className="w-16 h-16 flex-shrink-0 bg-white border border-gray-200 rounded flex items-center justify-center overflow-hidden"
                   >
-                    <img 
-                      src={productImage} 
-                      alt={item.name} 
-                      className="w-full h-full object-contain" 
+                    <img
+                      src={productImage || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNFRUU4QUEiIC8+PHRleHQgeD0iNTAiIHk9IjUwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM1NTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBOb3QgRnVuZDwvdGV4dD48L3N2Zz4='}
+                      alt={item.name}
+                      className="w-full h-full object-contain"
                       loading="lazy"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNFRUU4QUEiIC8+PHRleHQgeD0iNTAiIHk9IjUwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM1NTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBOb3QgRnVuZDwvdGV4dD48L3N2Zz4=';
+                      }}
                     />
                   </Link>
                   <div className="flex-1 min-w-0">
@@ -179,7 +141,7 @@ export default function FixedCartSidebar() {
       </div>
 
       {/* Cart Summary - Fixed at bottom */}
-      <div className="border-t p-4 bg-white flex-shrink-0 shadow-lg z-10">
+      <div className="border-t p-4 bg-white shadow-lg mt-auto z-10">
         <div className="mb-4">
           <p className="text-lg font-bold text-gray-900">
             Cart subtotal: <span className="text-red-700">{formatCurrencyWithCommas(subtotal)}</span>
@@ -187,15 +149,15 @@ export default function FixedCartSidebar() {
         </div>
 
         <div className="space-y-2 mb-4">
-          <Link 
+          <Link
             href="/checkout"
-            className="block w-full bg-yellow-400 hover:bg-yellow-500 rounded-md py-2.5 text-center text-sm font-medium shadow-sm border border-yellow-600 transition-all duration-200 active:scale-95"
+            className="block w-full bg-[#FFD814] hover:bg-[#F7CA00] rounded-full py-2.5 text-center text-sm font-medium shadow-sm border border-[#FCD200] transition-colors"
           >
             Proceed to Buy ({totalItems} {totalItems === 1 ? 'item' : 'items'})
           </Link>
-          <Link 
+          <Link
             href="/cart"
-            className="block w-full bg-white border border-gray-300 hover:bg-gray-50 rounded-md py-2.5 text-center text-sm font-medium transition-colors"
+            className="block w-full bg-white border border-gray-300 hover:bg-gray-50 rounded-full py-2.5 text-center text-sm font-medium transition-colors shadow-sm"
           >
             Go to Cart
           </Link>

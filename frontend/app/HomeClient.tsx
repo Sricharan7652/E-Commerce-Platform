@@ -2,17 +2,18 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import HeaderWithSuspense from '@/components/HeaderWithSuspense';
+import HeroCarousel from '@/components/HeroCarousel';
 import ProductCard from '@/components/ProductCard';
 import FixedCartSidebar from '@/components/FixedCartSidebar';
 import { useNotification } from '@/hooks/useNotification';
 import { useAmazonToast } from '@/hooks/useAmazonToast';
 import { useCartSidebar } from '@/hooks/useCartSidebar';
 import { getAllProducts } from '@/lib/dummyProducts';
-import { productApi } from '@/lib/api';
+import { productApi, cartApi, wishlistApi } from '@/lib/api';
 
 interface Product {
-  _id: string;
-  id?: string;
+  _id?: string;
+  id?: string | number;
   name: string;
   description: string;
   price: number;
@@ -39,46 +40,81 @@ export default function HomeClient() {
   const { showNotification, NotificationComponent } = useNotification();
   const { showToast, ToastComponent } = useAmazonToast();
   const { showCartSidebar, CartSidebarComponent } = useCartSidebar();
+  const [cartItems, setCartItems] = useState<any[]>([]);
+  const [wishlistIds, setWishlistIds] = useState<string[]>([]);
 
-  // Fetch products and categories
+  // Fetch wishlist
+  const fetchWishlist = useCallback(async () => {
+    try {
+      const data = await wishlistApi.getWishlist();
+      const ids = data.wishlist?.map((item: any) => String(item.product_id)) || [];
+      setWishlistIds(ids);
+    } catch (err) {
+      console.error('Failed to fetch wishlist:', err);
+    }
+  }, []);
+
+  // Fetch products, categories, and wishlist
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Try to fetch from API first
         const [productsData, categoriesData] = await Promise.all([
           productApi.getProducts(),
           productApi.getCategories()
         ]);
-        
-        if (productsData && productsData.length > 0) {
-          setProducts(productsData);
-        } else {
-          // Fallback to dummy data
-          const dummyProducts = getAllProducts();
-          setProducts(dummyProducts);
-        }
-        
-        if (categoriesData && categoriesData.length > 0) {
-          setCategories(categoriesData);
-        } else {
-          // Fallback to dummy categories
-          const dummyCategories = ['Electronics', 'Clothing', 'Home & Kitchen'];
-          setCategories(dummyCategories);
-        }
+
+        if (productsData) setProducts(productsData);
+        if (categoriesData) setCategories(categoriesData);
+        fetchWishlist();
       } catch (error) {
         console.error('Failed to fetch data:', error);
         // Fallback to dummy data
-        const dummyProducts = getAllProducts();
-        setProducts(dummyProducts);
-        const dummyCategories = ['Electronics', 'Clothing', 'Home & Kitchen'];
-        setCategories(dummyCategories);
+        setProducts(getAllProducts());
+        setCategories(['Electronics', 'Clothing', 'Home & Kitchen']);
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
+
+    // Listen for wishlist updates
+    const handleWishlistUpdate = () => fetchWishlist();
+    window.addEventListener('wishlistUpdated', handleWishlistUpdate);
+    return () => window.removeEventListener('wishlistUpdated', handleWishlistUpdate);
+  }, [fetchWishlist]);
+
+  // Fetch cart
+  const fetchCart = useCallback(async () => {
+    try {
+      const data = await cartApi.getCart();
+      const rawItems = data.cart || [];
+      // Format items for UI consistency (price as number, product_id mapped)
+      const items = rawItems.map((item: any) => ({
+        ...item,
+        _id: item.product_id, // For product links
+        price: Number(item.price) || 0,
+        id: item.id // Cart item ID
+      }));
+
+      setCartItems(items);
+      const count = items.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0);
+      setCartCount(count);
+    } catch (err) {
+      console.error('Failed to fetch cart:', err);
+      setCartCount(0);
+      setCartItems([]);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchCart();
+
+    // Listen for cart updates from other components
+    const handleCartUpdate = () => fetchCart();
+    window.addEventListener('cartUpdated', handleCartUpdate);
+    return () => window.removeEventListener('cartUpdated', handleCartUpdate);
+  }, [fetchCart]);
 
   // Sync search term and category from URL params
   useEffect(() => {
@@ -108,97 +144,40 @@ export default function HomeClient() {
     setFilteredProducts(filtered);
   }, [products, searchTerm, category]);
 
-  // Fetch cart count
-  useEffect(() => {
-    const fetchCart = () => {
-      try {
-        const cartData = localStorage.getItem('cart');
-        if (cartData) {
-          const cart = JSON.parse(cartData);
-          const count = cart.items?.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0) || 0;
-          setCartCount(count);
-        } else {
-          setCartCount(0);
-        }
-      } catch (err) {
-        setCartCount(0);
-      }
-    };
-
-    fetchCart();
-
-    // Listen for cart updates
-    const handleCartUpdate = () => {
-      fetchCart();
-    };
-
-    window.addEventListener('cartUpdated', handleCartUpdate);
-    return () => {
-      window.removeEventListener('cartUpdated', handleCartUpdate);
-    };
-  }, []);
-
-  const handleAddToCart = (product: Product) => {
+  const handleAddToCart = async (product: Product) => {
     try {
-      // Get current cart from localStorage
-      const cartData = localStorage.getItem('cart');
-      const cart = cartData ? JSON.parse(cartData) : { items: [] };
-      
-      // Check if product already exists in cart
-      const existingItemIndex = cart.items.findIndex((item: any) => item._id === product._id);
-      
-      if (existingItemIndex >= 0) {
-        // Update quantity if already in cart
-        cart.items[existingItemIndex].quantity += 1;
-      } else {
-        // Add new item to cart
-        cart.items.push({
-          ...product,
-          quantity: 1
-        });
-      }
-      
-      // Save updated cart
-      localStorage.setItem('cart', JSON.stringify(cart));
-      
-      // Update cart count
-      const newCount = cart.items.reduce((acc: number, item: any) => acc + item.quantity, 0);
-      setCartCount(newCount);
-      
+      const productId = String(product._id || product.id || '');
+      await cartApi.addToCart(productId, 1);
+
+      // Update local state immediately for responsiveness
+      await fetchCart();
+
       // Show success message
       showToast('Added to Cart');
       showCartSidebar();
-      
+
       // Dispatch event to update other components
       window.dispatchEvent(new Event('cartUpdated'));
     } catch (error) {
       console.error('Error adding to cart:', error);
-      showNotification('Failed to add item to cart', 'error');
+      showNotification('Failed to add item to cart. Make sure backend is running.', 'error');
     }
   };
 
-  const handleUpdateQuantity = (productId: string, quantity: number) => {
+  const handleUpdateQuantity = async (productId: string, quantity: number) => {
     try {
-      const cartData = localStorage.getItem('cart');
-      let cart = cartData ? JSON.parse(cartData) : { items: [] };
-      
-      const itemIndex = cart.items.findIndex((item: any) => item._id === productId);
-      if (itemIndex >= 0) {
-        if (quantity <= 0) {
-          cart.items.splice(itemIndex, 1);
-        } else {
-          cart.items[itemIndex].quantity = quantity;
-        }
-        
-        localStorage.setItem('cart', JSON.stringify(cart));
-        
-        // Update cart count
-        const newCount = cart.items.reduce((acc: number, item: any) => acc + item.quantity, 0);
-        setCartCount(newCount);
-        
-        // Dispatch event to update other components
-        window.dispatchEvent(new Event('cartUpdated'));
+      // Find cart item ID
+      const item = cartItems.find((item: any) => item.product_id === productId || item._id === productId);
+      if (!item) return;
+
+      if (quantity <= 0) {
+        await cartApi.removeFromCart(item.id || item._id); // DB cart item id
+      } else {
+        await cartApi.updateQuantity(item.id || item._id, quantity);
       }
+
+      await fetchCart();
+      window.dispatchEvent(new Event('cartUpdated'));
     } catch (error) {
       console.error('Error updating quantity:', error);
     }
@@ -209,24 +188,15 @@ export default function HomeClient() {
   };
 
   const getProductQuantity = (productId: string) => {
-    try {
-      const cartData = localStorage.getItem('cart');
-      if (cartData) {
-        const cart = JSON.parse(cartData);
-        const item = cart.items.find((item: any) => item._id === productId);
-        return item ? item.quantity : 0;
-      }
-    } catch (error) {
-      console.error('Error getting product quantity:', error);
-    }
-    return 0;
+    const item = cartItems.find((item: any) => item.product_id === productId || item._id === productId);
+    return item ? item.quantity : 0;
   };
 
   const handleSearch = useCallback((searchTerm: string, category: string) => {
     const params = new URLSearchParams();
     if (searchTerm) params.set('q', searchTerm);
     if (category && category !== 'All') params.set('category', category);
-    
+
     const query = params.toString();
     router.push(query ? `/?${query}` : '/');
   }, [router]);
@@ -246,52 +216,74 @@ export default function HomeClient() {
       {CartSidebarComponent}
       <HeaderWithSuspense cartCount={cartCount} onSearch={handleSearch} />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Results Summary */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">
-            {searchTerm || category !== 'All' ? 'Search Results' : 'All Products'}
-          </h1>
-          <p className="text-sm text-gray-600">
-            {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'} found
-          </p>
+      <div className="min-h-screen bg-gray-100 font-sans">
+        {/* Full Width Carousel */}
+        <div className="pt-[10px]">
+          <HeroCarousel />
         </div>
 
-        {/* Products Grid */}
-        {filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => (
-              <ProductCard
-                key={product._id}
-                product={{
-                  ...product,
-                  rating: product.rating || 0,
-                  numReviews: product.numReviews || 0,
-                  stock_quantity: product.stock_quantity || 0
-                }}
-                onAddToCart={handleAddToCart}
-                onUpdateQuantity={handleUpdateQuantity}
-                onRemoveFromCart={handleRemoveFromCart}
-                initialQuantity={getProductQuantity(product._id)}
-              />
-            ))}
+        <main className="max-w-[1500px] mx-auto px-4 py-6">
+          <div className="flex flex-col lg:flex-row gap-6 items-start">
+
+            {/* Left Side: Product Grid */}
+            <div className="flex-1 w-full lg:min-w-0">
+              {/* Results Summary */}
+              <div className="mb-4 pb-4 border-b border-gray-200 bg-white p-4 rounded-t-md shadow-sm">
+                <h1 className="text-xl font-bold text-gray-900">
+                  {searchTerm || category !== 'All' ? 'Search Results' : 'Related to items you\'ve viewed'}
+                </h1>
+                <p className="text-sm text-gray-600 mt-1">
+                  {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'} found
+                </p>
+              </div>
+
+              {/* Products Grid */}
+              {filteredProducts.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {filteredProducts.map((product) => (
+                    <ProductCard
+                      key={product.id || product._id || Math.random().toString()}
+                      product={{
+                        ...product,
+                        rating: product.rating || 0,
+                        numReviews: product.numReviews || 0,
+                        stock_quantity: product.stock_quantity || 0
+                      }}
+                      isInWishlist={wishlistIds.includes(String(product._id || product.id || ''))}
+                      onAddToCart={handleAddToCart}
+                      onUpdateQuantity={handleUpdateQuantity}
+                      onRemoveFromCart={handleRemoveFromCart}
+                      initialQuantity={getProductQuantity(product._id || '')}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 bg-white rounded-lg border border-gray-200 shadow-sm">
+                  <div className="text-gray-500 text-lg mb-4">No products found</div>
+                  <button
+                    onClick={() => {
+                      setSearchTerm('');
+                      setCategory('All');
+                      router.push('/');
+                    }}
+                    className="text-blue-600 hover:text-orange-600 hover:underline"
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Right Side: Fixed Cart Sidebar */}
+            {cartCount > 0 && (
+              <div className="hidden lg:block w-80 flex-shrink-0">
+                <FixedCartSidebar items={cartItems} />
+              </div>
+            )}
+
           </div>
-        ) : (
-          <div className="text-center py-12">
-            <div className="text-gray-500 text-lg mb-4">No products found</div>
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setCategory('All');
-                router.push('/');
-              }}
-              className="text-blue-600 hover:text-orange-600 hover:underline"
-            >
-              Clear filters
-            </button>
-          </div>
-        )}
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

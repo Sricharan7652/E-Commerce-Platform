@@ -58,7 +58,7 @@ export const productApi = {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
       if (category && category !== 'All') params.append('category', category);
-      
+
       const response = await api.get(`/products?${params.toString()}`);
       return response.data.products || [];
     } catch (error: any) {
@@ -88,6 +88,59 @@ export const productApi = {
       throw error;
     }
   },
+};
+
+export const cartApi = {
+  getCart: async () => {
+    const response = await api.get('/cart');
+    return response.data;
+  },
+  addToCart: async (productId: string, quantity: number) => {
+    const response = await api.post('/cart', { productId, quantity });
+    return response.data;
+  },
+  updateQuantity: async (itemId: string, quantity: number) => {
+    const response = await api.put(`/cart/${itemId}`, { quantity });
+    return response.data;
+  },
+  removeFromCart: async (itemId: string) => {
+    const response = await api.delete(`/cart/${itemId}`);
+    return response.data;
+  },
+  clearCart: async () => {
+    const response = await api.delete('/cart');
+    return response.data;
+  }
+};
+
+export const orderApi = {
+  placeOrder: async (shippingAddress: any) => {
+    const response = await api.post('/orders', { shippingAddress });
+    return response.data;
+  },
+  getOrders: async () => {
+    const response = await api.get('/orders');
+    return response.data;
+  },
+  getOrderById: async (id: string) => {
+    const response = await api.get(`/orders/${id}`);
+    return response.data;
+  }
+};
+
+export const wishlistApi = {
+  getWishlist: async () => {
+    const response = await api.get('/wishlist');
+    return response.data;
+  },
+  addToWishlist: async (productId: string) => {
+    const response = await api.post('/wishlist', { productId });
+    return response.data;
+  },
+  removeFromWishlist: async (productId: string) => {
+    const response = await api.delete(`/wishlist/${productId}`);
+    return response.data;
+  }
 };
 
 export default api;
