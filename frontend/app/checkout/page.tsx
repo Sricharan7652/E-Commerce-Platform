@@ -111,12 +111,15 @@ export default function Checkout() {
 
       const errorMessage = err.response?.data?.message || 'Failed to place order';
 
-      if (errorMessage === 'Cart is empty' || err.response?.status === 400 && errorMessage.toLowerCase().includes('empty')) {
-        showNotification('Your cart is empty. Returning to home page...', 'error');
+      if (
+        errorMessage.includes('Cart is empty') ||
+        (err.response?.status === 400 && errorMessage.toLowerCase().includes('empty'))
+      ) {
+        showNotification('Your cart is empty. Redirecting to home...', 'error');
         // Refresh cart to show it's actually empty
-        fetchCart();
+        await fetchCart();
         window.dispatchEvent(new Event('cartUpdated'));
-        setTimeout(() => router.push('/'), 2000);
+        setTimeout(() => router.push('/'), 1500);
       } else {
         showNotification(errorMessage, 'error');
       }
