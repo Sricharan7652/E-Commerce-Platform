@@ -5,7 +5,8 @@ export async function GET(request: NextRequest) {
   const searchParams = url.searchParams;
 
   // Forward request to backend
-  const backendUrl = `https://e-commerce-platform-1-14hu.onrender.com/api${url.pathname.replace('/api', '')}?${searchParams}`;
+  const backendBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  const backendUrl = `${backendBaseUrl}${url.pathname.replace('/api', '')}?${searchParams}`;
 
   try {
     const response = await fetch(backendUrl, {
