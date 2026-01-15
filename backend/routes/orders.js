@@ -135,15 +135,16 @@ router.post('/', auth, async (req, res) => {
         `;
 
         const sendEmail = require('../utils/email');
-        await sendEmail({
+        // Don't await email - fire and forget to prevent blocking the response
+        sendEmail({
           email: user.email,
           subject: `Your Amazon Clone Order #${orderResult.rows[0].id}`,
           message
-        });
+        }).catch(err => console.error('Background email failed:', err));
       }
-    } catch (emailError) {
-      console.error('Failed to send confirmation email:', emailError);
-      // Continue execution, do not fail order for email error
+    } catch (error) {
+      // Log error but don't fail the request
+      console.error('Email setup error:', error);
     }
 
     res.status(201).json({
