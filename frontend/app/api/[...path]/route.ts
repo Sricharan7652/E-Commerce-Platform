@@ -3,10 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const searchParams = url.searchParams;
-  
+
   // Forward request to backend
   const backendUrl = `https://e-commerce-platform-1-14hu.onrender.com/api${url.pathname.replace('/api', '')}?${searchParams}`;
-  
+
   try {
     const response = await fetch(backendUrl, {
       method: request.method,
@@ -17,9 +17,9 @@ export async function GET(request: NextRequest) {
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       },
     });
-    
+
     const data = await response.json();
-    
+
     return NextResponse.json(data, {
       status: response.status,
       headers: {
@@ -40,10 +40,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const url = new URL(request.url);
   const body = await request.json();
-  
+
   // Forward request to backend
-  const backendUrl = `https://e-commerce-platform-1-14hu.onrender.com/api${url.pathname.replace('/api', '')}`;
-  
+  const backendBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  const backendUrl = `${backendBaseUrl}${url.pathname.replace('/api', '')}`;
+
   try {
     const response = await fetch(backendUrl, {
       method: request.method,
@@ -55,9 +56,9 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify(body),
     });
-    
+
     const data = await response.json();
-    
+
     return NextResponse.json(data, {
       status: response.status,
       headers: {
