@@ -10,7 +10,6 @@ export const getBaseURL = () => {
   return '/api';
 };
 
-console.log('🔌 API Base URL:', getBaseURL()); // Debug log to check connection URL
 
 const api = axios.create({
   baseURL: getBaseURL(),
