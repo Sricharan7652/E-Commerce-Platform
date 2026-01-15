@@ -25,6 +25,7 @@ export default function Checkout() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const { showNotification, NotificationComponent } = useNotification();
 
   // Fetch cart
@@ -81,11 +82,14 @@ export default function Checkout() {
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPlacingOrder) return; // Prevent double submission
+
     if (!validateForm()) {
       showNotification('Please fill in all required fields correctly', 'error');
       return;
     }
 
+    setIsPlacingOrder(true);
     await proceedWithOrder();
   };
 
@@ -108,6 +112,7 @@ export default function Checkout() {
 
     } catch (err: any) {
       console.error('Failed to place order:', err);
+      setIsPlacingOrder(false); // Re-enable button on error
 
       const errorMessage = err.response?.data?.message || 'Failed to place order';
 
@@ -421,9 +426,10 @@ export default function Checkout() {
             <div className="lg:hidden mt-6">
               <button
                 type="submit"
-                className="w-full bg-yellow-400 hover:bg-yellow-500 rounded-md py-3 shadow font-medium"
+                disabled={isPlacingOrder}
+                className="w-full bg-yellow-400 hover:bg-yellow-500 rounded-md py-3 shadow font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Place your order
+                {isPlacingOrder ? 'Processing...' : 'Place your order'}
               </button>
             </div>
           </form>
@@ -434,9 +440,10 @@ export default function Checkout() {
           <div className="bg-white border rounded-md p-6 sticky top-4 shadow-sm">
             <button
               onClick={handlePlaceOrder}
-              className="w-full bg-yellow-400 hover:bg-yellow-500 rounded-md py-2 shadow-sm text-sm font-medium mb-4"
+              disabled={isPlacingOrder}
+              className="w-full bg-yellow-400 hover:bg-yellow-500 rounded-md py-2 shadow-sm text-sm font-medium mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Place your order
+              {isPlacingOrder ? 'Processing...' : 'Place your order'}
             </button>
             <p className="text-xs text-center text-gray-500 mb-4 border-b pb-2">
               By placing your order, you agree to Amazon's{' '}
