@@ -8,7 +8,6 @@ import FixedCartSidebar from '@/components/FixedCartSidebar';
 import { useNotification } from '@/hooks/useNotification';
 import { useAmazonToast } from '@/hooks/useAmazonToast';
 import { useCartSidebar } from '@/hooks/useCartSidebar';
-import { getAllProducts } from '@/lib/dummyProducts';
 import { productApi, cartApi, wishlistApi } from '@/lib/api';
 
 interface Product {
