@@ -8,7 +8,12 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ['https://e-commerce-platform-08qc.onrender.com', 'https://e-commerce-platform-4tn0.onrender.com', 'http://localhost:3000', 'http://localhost:3001'],
+  origin: [
+    process.env.FRONTEND_URL, // Allow the deployed frontend URL
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:5173' // Vite default port
+  ].filter(Boolean), // Remove undefined/falsy values if env var is missing
   credentials: true
 }));
 app.use(express.json());
