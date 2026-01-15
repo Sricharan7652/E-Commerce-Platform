@@ -108,7 +108,18 @@ export default function Checkout() {
 
     } catch (err: any) {
       console.error('Failed to place order:', err);
-      showNotification(err.response?.data?.message || 'Failed to place order', 'error');
+
+      const errorMessage = err.response?.data?.message || 'Failed to place order';
+
+      if (errorMessage === 'Cart is empty' || err.response?.status === 400 && errorMessage.toLowerCase().includes('empty')) {
+        showNotification('Your cart is empty. Returning to home page...', 'error');
+        // Refresh cart to show it's actually empty
+        fetchCart();
+        window.dispatchEvent(new Event('cartUpdated'));
+        setTimeout(() => router.push('/'), 2000);
+      } else {
+        showNotification(errorMessage, 'error');
+      }
     }
   };
 
