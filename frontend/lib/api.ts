@@ -13,6 +13,7 @@ export const getBaseURL = () => {
 console.log('🔌 API Base URL:', getBaseURL()); // Debug log to check connection URL
 
 const api = axios.create({
+  baseURL: getBaseURL(),
   timeout: 60000, // 60 second timeout for deployed backend (Render can be slow on first request)
 });
 
