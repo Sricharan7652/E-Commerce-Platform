@@ -13,7 +13,7 @@ export const getBaseURL = () => {
 
 const api = axios.create({
   baseURL: getBaseURL(),
-  timeout: 60000, // 60 second timeout for deployed backend (Render can be slow on first request)
+  timeout: 120000, // 120 second timeout for deployed backend (Render can be slow on first request)
 });
 
 // Note: Auth token is now handled in request interceptor for dynamic updates
