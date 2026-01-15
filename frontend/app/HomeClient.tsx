@@ -68,9 +68,9 @@ export default function HomeClient() {
         fetchWishlist();
       } catch (error) {
         console.error('Failed to fetch data:', error);
-        // Fallback to dummy data
-        setProducts(getAllProducts());
-        setCategories(['Electronics', 'Clothing', 'Home & Kitchen']);
+        // Fallback to empty state
+        setProducts([]);
+        setCategories([]);
       } finally {
         setLoading(false);
       }
